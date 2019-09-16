@@ -48,5 +48,41 @@ pressure %>%
 
 # Materials
 
+## Suggested Topics
+
+Feel free to adapt anything you'd like from my `purrr` tutorial 
+
+https://www.weirdfishes.blog/blog/practical-purrr/
+
+I've included the code for that in the presentations folder
+
+Given short amount of time, I don't recommend trying to teach both the apply suite (apply, lapply, sapply) and purrr in depth. I've found people have an easier time learning map over apply, mostly because the syntax is the same across all map_ functions, as oppoesd to apply (e.g. first argument to `apply` are the data, first to `mapply` is a function); `map` seems to make it easier to focus on whats happening an not the function structure. purrr is also much more consistent about the type of object produced by the function. So I might recommend focusing on purrr and showing an example or two using base apply so that thaty have that to compare to. 
+
+## Suggested Topics
+
+- Writing functions
+  - pure functions
+  - http://adv-r.had.co.nz/Functions.html
+
+- Debugging functions
+  - browser, breakpoints, etc. 
+  
+- Applying functions
+  - basic use of function in map/apply
+  - annonymous functions (in map at least)
+  - map, map2, pmap
+    - with different kinds of outputs, e.g. map_chr vs map_dbl
+
+## Suggested Topics
+
+- Manipulating lists
+  - Using purrr to access/modify parts of deeply nested lists (https://github.com/jennybc/repurrrsive)
+
+- Organizing list objects in tibbles
+  - creating and accessing elements of list-columns
+  
+- Putting it all together
+  - e.g. the regression example in my tutorial
+
 
 
