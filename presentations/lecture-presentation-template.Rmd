@@ -73,6 +73,14 @@ Given short amount of time, I don't recommend trying to teach both the apply sui
   - annonymous functions (in map at least)
   - map, map2, pmap
     - with different kinds of outputs, e.g. map_chr vs map_dbl
+    
+## Suggested Topics
+
+- Non-standard evaluation
+  - e.g. passing grouping variables as a variable to a function
+  - https://tidyeval.tidyverse.org/
+  - https://github.com/rstudio/cheatsheets/raw/master/tidyeval.pdf
+
 
 ## Suggested Topics
 
