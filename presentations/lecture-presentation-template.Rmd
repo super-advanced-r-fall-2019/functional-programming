@@ -4,10 +4,10 @@ subtitle: "FSH 507 Fall 2019"
 author: "Your Name"
 date: " `r Sys.Date()`"
 output:
-  powerpoint_presentation: default
   ioslides_presentation: default
-  html_document: default
   slidy_presentation: default
+  html_document: default
+  powerpoint_presentation: default
 ---
 
 ```{r setup, include=FALSE}
@@ -66,6 +66,7 @@ Given short amount of time, I don't recommend trying to teach both the apply sui
 
 - Debugging functions
   - browser, breakpoints, etc. 
+  - using purrr::safely
   
 - Applying functions
   - basic use of function in map/apply
@@ -83,6 +84,18 @@ Given short amount of time, I don't recommend trying to teach both the apply sui
   
 - Putting it all together
   - e.g. the regression example in my tutorial
+  - use a tibble to organize candidate models
+  - create list column of fitted models
+  - use `map` to extract things RMSE for each model, adding results as a double column
 
+## Suggested Topics
+
+A few other resources
+
+* https://speakerdeck.com/jennybc/purrr-workshop?slide=6
+
+* https://jennybc.github.io/purrr-tutorial/
+
+* http://adv-r.had.co.nz/Functions.html
 
 
