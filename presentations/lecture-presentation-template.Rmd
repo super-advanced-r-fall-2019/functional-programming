@@ -63,18 +63,19 @@ Given short amount of time, I don't recommend trying to teach both the apply sui
 - Writing functions
   - pure functions
   - http://adv-r.had.co.nz/Functions.html
+  - setting default values
+  - documenting functions with `roxygen`
   - environments
     - DON'T USE GLOBAL VARIABLE INSIDE FUNCTIONS
     - what happens inside functions stays inside functions
       - except the results of the function
       - or for special things like `rm`
-    - Getting things out of functions
-      - returning list objects
+  - Getting things out of functions
+    - returning list objects
 
 - Debugging functions
   - browser, breakpoints, etc. 
-  - using purrr::safely
-  
+
 - Applying functions
   - basic use of function in map/apply
   - annonymous functions (in map at least)
