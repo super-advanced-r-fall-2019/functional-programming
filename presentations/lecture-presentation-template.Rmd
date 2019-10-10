@@ -63,6 +63,13 @@ Given short amount of time, I don't recommend trying to teach both the apply sui
 - Writing functions
   - pure functions
   - http://adv-r.had.co.nz/Functions.html
+  - environments
+    - DON'T USE GLOBAL VARIABLE INSIDE FUNCTIONS
+    - what happens inside functions stays inside functions
+      - except the results of the function
+      - or for special things like `rm`
+    - Getting things out of functions
+      - returning list objects
 
 - Debugging functions
   - browser, breakpoints, etc. 
