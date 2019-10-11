@@ -1,0 +1,365 @@
+---
+title: "Functional Programming"
+subtitle: "FSH 507 Fall 2019"
+author: "Dan Ovando and Mark Sorel"
+date: " `r Sys.Date()`"
+output:
+  slidy_presentation: default
+  ioslides_presentation: default
+  html_document: default
+  powerpoint_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(gapminder)
+```
+
+# Acknowledgements
+
+This background material on functions is adapted from Hadley Wickham's Advanced R (2nd eddition). See that book for more details
+
+# Function fundamentals
+
+* Three components: **arguments, body, and environment**.
+
+Except  "primitive" base functions that are implemented purely in C.
+
+* Functions are objects, just as vectors are objects.
+
+
+# A function has three parts
+
+* The `formals()`, the list of arguments that control how you call the function.
+  
+* The `body()`, the code inside the function.
+
+* The `environment()`, the data structure that determines how the function finds the values associated with the names.
+
+Can return anything: including a list of lots of things, or a function. 
+
+
+
+# Environments
+
+* The environment is specified implicitly, based on _where_ you defined the function. 
+
+* The function environment always exists, but it is only printed when the function isn't defined in the global environment.
+
+# Environments cont.
+
+```{r, echo = TRUE}
+f02 <- function(x, y) {
+  # A comment
+  x + y
+}
+formals(f02)
+body(f02)
+environment(f02)
+```
+
+
+
+# First-class functions {#first-class-functions}
+\index{functions!anonymous} 
+\index{anonymous functions}
+
+R functions are objects. You create a function object with `function` and bind it to a name with `<-`:
+
+```{r, echo=TRUE}
+f01 <- function(x) {
+  sin(1 / x ^ 2)
+}
+```
+
+If you don't bind a function to a name, you get an __anonymous function__.
+
+```{r, eval = FALSE, echo=TRUE}
+lapply(mtcars, function(x) length(unique(x)))
+Filter(function(x) !is.numeric(x), mtcars)
+```
+
+A final option is to put functions in a list:
+
+```{r, echo=T}
+funs <- list(
+  half = function(x) x / 2,
+  double = function(x) x * 2
+)
+funs$double(10)
+```
+
+
+# Lexical scoping
+
+**scoping**: finding the value associated with a name.
+
+what will the following code return, 10 or 20?
+
+```{r, results = "hide", echo=TRUE}
+x <- 10
+g01 <- function() {
+  x <- 20
+  x
+}
+g01()
+```
+
+# Lexical scoping
+
+**scoping**: finding the value associated with a name.
+
+what will the following code return, 10 or 20?
+
+```{r, echo=TRUE}
+x <- 10
+g01 <- function() {
+  x <- 20
+  x
+}
+g01()
+```
+
+# Lexical scoping cont.
+
+R uses __lexical scoping__: it looks up the values of names based on how a function is defined
+
+R’s lexical scoping follows four primary rules:
+
+* Name masking
+* Functions versus variables
+* A fresh start
+* Dynamic lookup
+
+# Name masking
+
+names defined inside a function mask names defined outside
+
+```{r, echo=TRUE}
+x <- 10
+y <- 20
+g02 <- function() {
+  x <- 1
+  y <- 2
+  c(x, y)
+}
+g02()
+```
+
+# Name masking cont.
+
+If a name isn't defined inside a function, R looks one level up.
+
+```{r, echo = TRUE}
+x <- 2
+g03 <- function() {
+  y <- 1
+  c(x, y)
+}
+g03()
+```
+
+And this doesn't change the previous value of y
+```{r, echo =TRUE}
+y
+```
+
+
+
+The same rules apply if a function is defined inside another function
+
+# A fresh start 
+
+
+when a function is called a new environment is created to host its execution. 
+Each invocation is completely independent.
+
+```{r, results = "hide",echo=TRUE}
+g11 <- function() {
+  if (!exists("a")) {
+    a <- 1
+  } else {
+    a <- a + 1
+  }
+  a
+}
+g11()
+```
+```{r,eval=FALSE, echo=TRUE}
+g11()
+```
+
+# A fresh start 
+
+
+when a function is called a new environment is created to host its execution. 
+Each invocation is completely independent.
+
+```{r,echo=TRUE}
+g11 <- function() {
+  if (!exists("a")) {
+    a <- 1
+  } else {
+    a <- a + 1
+  }
+  a
+}
+g11()
+```
+```{r,echo=TRUE}
+g11()
+```
+
+
+# Lazy evaluation {#lazy-evaluation}
+
+function arguments are only evaluated if accessed
+
+This allows you to include potentially expensive computations in function arguments that will only be evaluated if needed
+
+# Default arguments
+
+Default arguments are evaluated inside the function, so seemingly identical calls can yield different results. An extreme example:
+
+```{r, eval = FALSE, echo=TRUE}
+h05 <- function(x = ls()) {
+  a <- 1
+  x
+}
+# ls() evaluated inside h05:
+h05()
+#> [1] "a" "x"
+# ls() evaluated in global environment:
+h05(ls())
+#> [1] "h05"
+```
+
+
+# `...`  (dot-dot-dot) {#fun-dot-dot-dot}
+
+Functions can have a special argument `...` (pronounced dot-dot-dot). With it, a function can take any number of additional arguments. 
+
+You can also use `...` to pass those additional arguments on to another function.
+
+```{r,echo=TRUE}
+i01 <- function(y, z) {
+  list(y = y, z = z)
+}
+
+i02 <- function(x, ...) {
+  i01(...)
+}
+
+str(i02(x = 1, y = 2, z = 3))
+```
+
+
+
+# Function forms
+
+> To understand computations in R, two slogans are helpful:
+>
+> * Everything that exists is an object.
+> * Everything that happens is a function call.
+>
+> --- John Chambers
+
+
+# Functional programming (style)
+
+Strive to decompose the problem into isolated functions. Each function taken by itself is simple and straightforward. Complexity is handled by composing functions in various ways.
+
+A functional style can easily be analysed in isolation (i.e. using only local information), and hence is easier to automatically optimise or parallelise.
+
+# Functionals
+
+> To become significantly more reliable, code must become more transparent.
+> In particular, nested conditions and loops must be viewed with great
+> suspicion. Complicated control flows confuse programmers. Messy code often
+> hides bugs.
+>
+> --- Bjarne Stroustrup
+
+A __functional__ is a function that takes a function as an input and returns a vector as output. 
+
+Common functionals: `lapply()`, `apply()`, `tapply()`; purrr's `map()`;  `integrate()` and `optim()`.
+
+
+# Functionals cont. 
+
+A common use of functionals is as an alternative to for loops. Each functional is tailored for a specific task, so when you recognise the functional you immediately know why it's being used.
+
+
+If you're an experienced for loop user, switching to functionals is typically a pattern matching exercise. You look at the for loop and find a functional that matches the basic form.
+
+
+
+
+## Suggested Topics
+
+Feel free to adapt anything you'd like from my `purrr` tutorial 
+
+https://www.weirdfishes.blog/blog/practical-purrr/
+
+I've included the code for that in the presentations folder
+
+Given short amount of time, I don't recommend trying to teach both the apply suite (apply, lapply, sapply) and purrr in depth. I've found people have an easier time learning map over apply, mostly because the syntax is the same across all map_ functions, as oppoesd to apply (e.g. first argument to `apply` are the data, first to `mapply` is a function); `map` seems to make it easier to focus on whats happening an not the function structure. purrr is also much more consistent about the type of object produced by the function. So I might recommend focusing on purrr and showing an example or two using base apply so that thaty have that to compare to. 
+
+## Suggested Topics
+
+- Writing functions
+  - pure functions
+  - http://adv-r.had.co.nz/Functions.html
+  - setting default values
+  - documenting functions with `roxygen`
+  - environments
+    - DON'T USE GLOBAL VARIABLE INSIDE FUNCTIONS
+    - what happens inside functions stays inside functions
+      - except the results of the function
+      - or for special things like `rm`
+  - Getting things out of functions
+    - returning list objects
+
+- Debugging functions
+  - browser, breakpoints, etc. 
+
+- Applying functions
+  - basic use of function in map/apply
+  - annonymous functions (in map at least)
+  - map, map2, pmap
+    - with different kinds of outputs, e.g. map_chr vs map_dbl
+    
+## Suggested Topics
+
+- Non-standard evaluation
+  - e.g. passing grouping variables as a variable to a function
+  - https://tidyeval.tidyverse.org/
+  - https://github.com/rstudio/cheatsheets/raw/master/tidyeval.pdf
+
+
+## Suggested Topics
+
+- Manipulating lists
+  - Using purrr to access/modify parts of deeply nested lists (https://github.com/jennybc/repurrrsive)
+
+- Organizing list objects in tibbles
+  - creating and accessing elements of list-columns
+  
+- Putting it all together
+  - e.g. the regression example in my tutorial
+  - use a tibble to organize candidate models
+  - create list column of fitted models
+  - use `map` to extract things RMSE for each model, adding results as a double column
+
+## Suggested Topics
+
+A few other resources
+
+* https://speakerdeck.com/jennybc/purrr-workshop?slide=6
+
+* https://jennybc.github.io/purrr-tutorial/
+
+* http://adv-r.had.co.nz/Functions.html
+
+
