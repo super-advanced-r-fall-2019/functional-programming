@@ -1,0 +1,154 @@
+---
+title: "ram-regression-solutions"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(here)
+
+ram <- read_csv(here("data","ram_timeseries.csv"))
+
+
+
+# ram <- ram %>%
+#   pivot_longer(cols = matches("\\d"),
+#                names_to = "yearvar",
+#                values_to = "values") %>%
+#   separate(yearvar, '-', into = c("variable", "year"))
+
+ram <- ram %>%
+  pivot_longer(
+    cols = matches("\\d"),
+    names_to = c("variable", "year"),
+    values_to = "values",
+    names_pattern  = "(.*)-(.*)",
+    names_ptypes = list(year = integer())
+  ) %>%
+  pivot_wider(names_from = "variable", values_from = "values") %>% 
+  arrange(stockid, year)
+
+```
+
+Let's clean things up a bit
+
+
+```{r}
+
+ram_reg_data <- ram %>% 
+  select(-u_umsy) %>% 
+  mutate(has_things = !is.na(catch) & !is.na(b_bmsy)) %>% 
+  filter(has_things) %>% 
+  group_by(stockid) %>% 
+  mutate(rollmax = cummax(catch),
+         rollmean = cummean(catch),
+          max_catch = max(catch),
+         scatch = catch / max_catch,
+         scatch_lag1 = lag(scatch, 1),
+         scatch_lag2 = lag(scatch, 2),
+         log_b_bmsy = log(b_bmsy)) %>% 
+  mutate(c_rollmax = catch / rollmax,
+         c_rollmean = catch / rollmean) %>% 
+  filter(!is.na(scatch_lag1), !is.na(scatch_lag2),
+         !is.na(isscaap_group_name))
+
+ram_reg_data %>% 
+  ggplot(aes(year, scatch, group = stockid)) + 
+  geom_line()
+
+```
+
+
+```{r}
+ models <- c(
+  "log_b_bmsy ~ catch",
+  "log_b_bmsy ~ scatch",
+  "log_b_bmsy ~ scatch + c_rollmax + c_rollmean + scatch_lag1 + scatch_lag2",
+    "log_b_bmsy ~ scatch + c_rollmax + c_rollmean + scatch_lag1 + scatch_lag2 + isscaap_group_name",
+      "log_b_bmsy ~ scatch + c_rollmax + c_rollmean + scatch_lag1 + scatch_lag2 + isscaap_group_name + max_catch" 
+)
+
+model_fits <- tibble( model = models) %>% 
+  mutate(model_fit = map(model, ~lm(.x, data = ram_reg_data)))
+
+model_fits <- model_fits %>% 
+  mutate(model_aic = map_dbl(model_fit, AIC))
+
+model_fits %>% 
+  ggplot(aes(reorder(model, model_aic), model_aic)) + 
+  geom_col() + 
+  coord_flip()
+
+```
+
+
+
+Create some validation data
+
+
+```{r}
+
+vfold_ram <- rsample::vfold_cv(ram_reg_data, v = 5, repeats = 3) %>%
+  mutate(foldid = 1:nrow(.))
+
+ram_oob_tests <- tidyr::expand_grid(model = models,
+                                    foldid = vfold_ram$foldid) %>% 
+  left_join(vfold_ram, by = "foldid")
+
+
+```
+
+
+And now fit testing and apply to training
+
+
+```{r}
+
+fitfoo <- function(model, split){
+  
+  tempdat <- rsample::training(split)
+  
+  fit <- lm(model, data = tempdat)
+  
+}
+
+ram_oob_tests <- ram_oob_tests %>%
+  mutate(fit = map2(model, splits, fitfoo)) %>%
+  mutate(oob_pred = map2(fit, splits, ~ broom::augment(.x, newdata = rsample::testing(.y))))
+
+
+```
+
+And plot some things
+
+
+```{r}
+
+ram_oob_preds <- ram_oob_tests %>% 
+  select(model,oob_pred) %>% 
+  unnest(cols = oob_pred)
+
+ram_oob_preds %>% 
+  ggplot(aes(log_b_bmsy, .fitted, color = model)) + 
+  geom_point(show.legend = FALSE) + 
+  facet_wrap(~model)
+
+
+ram_oob_preds %>% 
+  group_by(model) %>% 
+  summarise(rmse = yardstick::rmse_vec(log_b_bmsy, .fitted),
+            r2 = yardstick::rsq_vec(log_b_bmsy, .fitted),
+            bias = mean(.fitted - log_b_bmsy, na.rm = TRUE)) %>% 
+  pivot_longer(cols = -model, names_to = "metric", values_to = "value") %>% 
+  ggplot(aes(model, value)) + 
+  geom_col() + 
+  facet_wrap(~metric) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, size = 2, color = "red"))
+
+```
+
+
+
+
+
+

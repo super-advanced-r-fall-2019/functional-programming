@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Data Wrangling and Model Fitting using purrr</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Dan Ovando" />
+    <meta name="date" content="2019-10-13" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <script src="libs/htmlwidgets/htmlwidgets.js"></script>
+    <link href="libs/jsoneditor/jsoneditor.min.css" rel="stylesheet" />
+    <script src="libs/jsoneditor/jsoneditor.min.js"></script>
+    <script src="libs/jsonedit-binding/jsonedit.js"></script>
+    <link rel="stylesheet" href="pres-things.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Data Wrangling and Model Fitting using <code>purrr</code>
+## FSH 507
+### Dan Ovando
+### University of Washington
+### 2019-10-13
+
+---
+
+
+
+
+
+
+# Getting Started
+
+Full credit to Jenny Bryan's [excellent `purrr` tutorial](https://jennybc.github.io/purrr-tutorial/) for helping me learn `purrr` and providing the basis for the list-wrangling examples here , along with Hadley Wickham &amp; Garret Grolemund's [R for Data Science](http://r4ds.had.co.nz). 
+
+My goal is to walk you through some of the concepts outlined in these (much better) resources
+
+Using `purrr` to...
+
+  - wrangle lists
+  
+  - nest and unnest tibbles
+  
+  - creating list objects
+  
+  - applying functions to tibble components
+
+---
+
+
+# Before anything else, `browser`
+
+`browser` will quickly becomes your best friend once you start using functional programming. 
+
+Calling `browser()` will stop execution of the R code where it is encountered, and drop the user into the environment where `browser` was encountered
+
+Let's you hop inside a function to see what's going on
+
+---
+
+# check out roxygen for documenting functions
+
+
+
+```r
+#' number of apples!
+#'
+#' @param x the number of things
+#' @param y the thing
+#'
+#' @return the number of things
+#' @export
+#'
+#' @examples
+#'
+#' foo(x = 2, y = "apples")
+apples &lt;- function(x = 2, y = "apples"){
+  
+  paste(x,y)
+  
+}
+```
+
+
+
+---
+
+# Why `purrr`?
+
+`purrr` basically takes on many of the tasks of the `apply` suite in base R (plus lots of other stuff). Like much of `tidyverse`, more about making things easier than new features
+
+From [SO](https://stackoverflow.com/questions/45101045/why-use-purrrmap-instead-of-lapply)
+
+.small[
+- The first argument to lapply() is the data; the first argument to mapply() is the function. The first argument to all map functions is always the data.
+
+- With vapply(), sapply(), and mapply() you can choose to suppress names on the output with USE.NAMES = FALSE; but lapply() doesn't have that argument.
+
+- There's no consistent way to pass consistent arguments on to the mapper function. Most functions use ... but mapply() uses MoreArgs (which you'd expect to be called MORE.ARGS), and Map(), Filter() and Reduce() expect you to create a new anonymous function. In map functions, constant argument always come after the function name.
+
+- Almost every purrr function is type stable: you can predict the output type exclusively from the function name. This is not true for sapply() or mapply(). Yes, there is vapply(); but there's no equivalent for mapply().
+]
+
+.center[**It's good to know how to use apply as well**]
+
+---
+
+# Basics of `purrr`
+
+.pull-left[
+
+What do we mean by applying functions?
+
+Take this simple example: print the string length of 5 shades
+
+].pull-right[
+
+
+```r
+shades &lt;- colors()[1:5]
+
+for (i in seq_along(shades)){
+  
+  print(stringr::str_length(shades[i]))
+  
+}
+```
+
+```
+## [1] 5
+## [1] 9
+## [1] 12
+## [1] 13
+## [1] 13
+```
+]
+
+---
+
+
+#  Apply solution
+
+.pull-left[
+
+
+```r
+  lapply(shades, str_length)
+```
+
+```
+## [[1]]
+## [1] 5
+## 
+## [[2]]
+## [1] 9
+## 
+## [[3]]
+## [1] 12
+## 
+## [[4]]
+## [1] 13
+## 
+## [[5]]
+## [1] 13
+```
+]
+.pull-right[
+
+
+```r
+ purrr::map(shades, str_length)
+```
+
+```
+## [[1]]
+## [1] 5
+## 
+## [[2]]
+## [1] 9
+## 
+## [[3]]
+## [1] 12
+## 
+## [[4]]
+## [1] 13
+## 
+## [[5]]
+## [1] 13
+```
+
+
+]
+
+---
+
+# Key `purrr` verbs
+
+.pull-left[
+
+`map` is the workhorse of the `purrr` family. It is basically `apply`
+
+  - The basic syntax works in the manner 
+
+  - `map("Lists to apply function to","Function to apply across lists","Additional parameters")`
+
+Since a dataframe is a special class of a list, we can `map` through each element (column in this case) of say `mtcars`
+] 
+.pull-right[
+
+```r
+map(mtcars, mean, na.rm = T)
+```
+
+```
+## $mpg
+## [1] 20.09062
+## 
+## $cyl
+## [1] 6.1875
+## 
+## $disp
+## [1] 230.7219
+## 
+## $hp
+## [1] 146.6875
+## 
+## $drat
+## [1] 3.596563
+## 
+## $wt
+## [1] 3.21725
+## 
+## $qsec
+## [1] 17.84875
+## 
+## $vs
+## [1] 0.4375
+## 
+## $am
+## [1] 0.40625
+## 
+## $gear
+## [1] 3.6875
+## 
+## $carb
+## [1] 2.8125
+```
+]
+
+---
+
+# Basics of `purrr`
+
+`map` by default returns a list. One nice feature of `map` and `purrr` is that we can specify the kind of output we want. 
+
+  - `map_TYPE` returns an object of class TYPE, e.g.
+
+    - `map_lgl` returns logical objects
+
+    - `map_df` returns data frames, etc.
+    
+
+
+```r
+map_df(mtcars, mean, na.rm = T)
+```
+
+```
+## # A tibble: 1 x 11
+##     mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
+##   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;
+## 1  20.1  6.19  231.  147.  3.60  3.22  17.8 0.438 0.406  3.69  2.81
+```
+
+
+---
+
+# Basics of `purrr`
+
+`map` can also be extended to deal with multiple input lists
+
+  - `map` applies a function over one list.
+
+  - `map2` applies a function over combinations of two lists in the form
+
+    - `map2(list1, list2, ~function(.x,.y), ...)`
+    
+  - `pmap` applies a function to arbitraty numbers of lists
+    - `pmap(list(a = a, b = b, c = d), function(a,b,c))`
+
+So, we can use `map2_chr` to map over two objects, apply a function, and return a character vector
+
+
+```r
+map2_chr(c('one','two','red','blue'), c('fish'), paste)
+```
+
+```
+## [1] "one fish"  "two fish"  "red fish"  "blue fish"
+```
+
+
+---
+
+# Multiple lists using `pmap`
+
+
+```r
+dmonds &lt;- diamonds %&gt;% 
+  slice(1:4)
+
+pmap_foo &lt;- function(list1, list2 , list3){
+  
+  paste0("Diamond #", list1, " sold for $", list2,
+         " and was ", list3, " carats")
+  
+}
+
+pmap_chr(list(list1 = 1:nrow(dmonds), 
+              list2 = dmonds$price, 
+              list3 = dmonds$carat), 
+         pmap_foo)
+```
+
+```
+## [1] "Diamond #1 sold for $326 and was 0.23 carats"
+## [2] "Diamond #2 sold for $326 and was 0.21 carats"
+## [3] "Diamond #3 sold for $327 and was 0.23 carats"
+## [4] "Diamond #4 sold for $334 and was 0.29 carats"
+```
+
+---
+
+
+# Exercise: Finding NAs
+
+Use `purrr` to find rows that have entries for both x and y (no using na.omit!)
+
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; x &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; y &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.0 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.3 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.0 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+
+---
+
+# Wrangling Lists
+
+.pull-left[
+We often treat R like fancy excel: Store data and apply functions in two dimensions
+
+Getting used to wrangling lists opens up lots of possibilities in R
+
+Let's start with the Game of Thrones database in the `repurrrsive` package (thanks again to [Jenny Bryan](https://github.com/jennybc/repurrrsive)). 
+
+`got_chars` is a list containing a bunch of information on GoT characters with a "point of view" chapter in the first few books. 
+
+]
+.pull-right[
+
+
+```r
+str(got_chars, list.len =  3)
+```
+
+```
+## List of 30
+##  $ :List of 18
+##   ..$ url        : chr "https://www.anapioficeandfire.com/api/characters/1022"
+##   ..$ id         : int 1022
+##   ..$ name       : chr "Theon Greyjoy"
+##   .. [list output truncated]
+##  $ :List of 18
+##   ..$ url        : chr "https://www.anapioficeandfire.com/api/characters/1052"
+##   ..$ id         : int 1052
+##   ..$ name       : chr "Tyrion Lannister"
+##   .. [list output truncated]
+##  $ :List of 18
+##   ..$ url        : chr "https://www.anapioficeandfire.com/api/characters/1074"
+##   ..$ id         : int 1074
+##   ..$ name       : chr "Victarion Greyjoy"
+##   .. [list output truncated]
+##   [list output truncated]
+```
+]
+
+---
+
+# Wrangling Lists
+
+
+```r
+listviewer::jsonedit(got_chars)
+```
+
+<div id="htmlwidget-409849e39179307f2e17" style="width:684px;height:396px;" class="jsonedit html-widget"></div>
+<script type="application/json" data-for="htmlwidget-409849e39179307f2e17">{"x":{"data":[{"url":"https://www.anapioficeandfire.com/api/characters/1022","id":1022,"name":"Theon Greyjoy","gender":"Male","culture":"Ironborn","born":"In 278 AC or 279 AC, at Pyke","died":"","alive":true,"titles":["Prince of Winterfell","Captain of Sea Bitch","Lord of the Iron Islands (by law of the green lands)"],"aliases":["Prince of Fools","Theon Turncloak","Reek","Theon Kinslayer"],"father":"","mother":"","spouse":"","allegiances":"House Greyjoy of Pyke","books":["A Game of Thrones","A Storm of Swords","A Feast for Crows"],"povBooks":["A Clash of Kings","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Alfie Allen"},{"url":"https://www.anapioficeandfire.com/api/characters/1052","id":1052,"name":"Tyrion Lannister","gender":"Male","culture":"","born":"In 273 AC, at Casterly Rock","died":"","alive":true,"titles":["Acting Hand of the King (former)","Master of Coin (former)"],"aliases":["The Imp","Halfman","The boyman","Giant of Lannister","Lord Tywin's Doom","Lord Tywin's Bane","Yollo","Hugor Hill","No-Nose","Freak","Dwarf"],"father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/2044","allegiances":"House Lannister of Casterly Rock","books":["A Feast for Crows","The World of Ice and Fire"],"povBooks":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Peter Dinklage"},{"url":"https://www.anapioficeandfire.com/api/characters/1074","id":1074,"name":"Victarion Greyjoy","gender":"Male","culture":"Ironborn","born":"In 268 AC or before, at Pyke","died":"","alive":true,"titles":["Lord Captain of the Iron Fleet","Master of the Iron Victory"],"aliases":"The Iron Captain","father":"","mother":"","spouse":"","allegiances":"House Greyjoy of Pyke","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords"],"povBooks":["A Feast for Crows","A Dance with Dragons"],"tvSeries":"","playedBy":""},{"url":"https://www.anapioficeandfire.com/api/characters/1109","id":1109,"name":"Will","gender":"Male","culture":"","born":"","died":"In 297 AC, at Haunted Forest","alive":false,"titles":"","aliases":"","father":"","mother":"","spouse":"","allegiances":[],"books":"A Clash of Kings","povBooks":"A Game of Thrones","tvSeries":"","playedBy":"Bronson Webb"},{"url":"https://www.anapioficeandfire.com/api/characters/1166","id":1166,"name":"Areo Hotah","gender":"Male","culture":"Norvoshi","born":"In 257 AC or before, at Norvos","died":"","alive":true,"titles":"Captain of the Guard at Sunspear","aliases":"","father":"","mother":"","spouse":"","allegiances":"House Nymeros Martell of Sunspear","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords"],"povBooks":["A Feast for Crows","A Dance with Dragons"],"tvSeries":["Season 5","Season 6"],"playedBy":"DeObia Oparei"},{"url":"https://www.anapioficeandfire.com/api/characters/1267","id":1267,"name":"Chett","gender":"Male","culture":"","born":"At Hag's Mire","died":"In 299 AC, at Fist of the First Men","alive":false,"titles":"","aliases":"","father":"","mother":"","spouse":"","allegiances":[],"books":["A Game of Thrones","A Clash of Kings"],"povBooks":"A Storm of Swords","tvSeries":"","playedBy":""},{"url":"https://www.anapioficeandfire.com/api/characters/1295","id":1295,"name":"Cressen","gender":"Male","culture":"","born":"In 219 AC or 220 AC","died":"In 299 AC, at Dragonstone","alive":false,"titles":"Maester","aliases":"","father":"","mother":"","spouse":"","allegiances":[],"books":["A Storm of Swords","A Feast for Crows"],"povBooks":"A Clash of Kings","tvSeries":"Season 2","playedBy":"Oliver Ford"},{"url":"https://www.anapioficeandfire.com/api/characters/130","id":130,"name":"Arianne Martell","gender":"Female","culture":"Dornish","born":"In 276 AC, at Sunspear","died":"","alive":true,"titles":"Princess of Dorne","aliases":"","father":"","mother":"","spouse":"","allegiances":"House Nymeros Martell of Sunspear","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Dance with Dragons"],"povBooks":"A Feast for Crows","tvSeries":"","playedBy":""},{"url":"https://www.anapioficeandfire.com/api/characters/1303","id":1303,"name":"Daenerys Targaryen","gender":"Female","culture":"Valyrian","born":"In 284 AC, at Dragonstone","died":"","alive":true,"titles":["Queen of the Andals and the Rhoynar and the First Men, Lord of the Seven Kingdoms","Khaleesi of the Great Grass Sea","Breaker of Shackles/Chains","Queen of Meereen","Princess of Dragonstone"],"aliases":["Dany","Daenerys Stormborn","The Unburnt","Mother of Dragons","Mother","Mhysa","The Silver Queen","Silver Lady","Dragonmother","The Dragon Queen","The Mad King's daughter"],"father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/1346","allegiances":"House Targaryen of King's Landing","books":"A Feast for Crows","povBooks":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Emilia Clarke"},{"url":"https://www.anapioficeandfire.com/api/characters/1319","id":1319,"name":"Davos Seaworth","gender":"Male","culture":"Westeros","born":"In 260 AC or before, at King's Landing","died":"","alive":true,"titles":["Ser","Lord of the Rainwood","Admiral of the Narrow Sea","Hand of the King"],"aliases":["Onion Knight","Davos Shorthand","Ser Onions","Onion Lord","Smuggler"],"father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/1676","allegiances":["House Baratheon of Dragonstone","House Seaworth of Cape Wrath"],"books":"A Feast for Crows","povBooks":["A Clash of Kings","A Storm of Swords","A Dance with Dragons"],"tvSeries":["Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Liam Cunningham"},{"url":"https://www.anapioficeandfire.com/api/characters/148","id":148,"name":"Arya Stark","gender":"Female","culture":"Northmen","born":"In 289 AC, at Winterfell","died":"","alive":true,"titles":"Princess","aliases":["Arya Horseface","Arya Underfoot","Arry","Lumpyface","Lumpyhead","Stickboy","Weasel","Nymeria","Squan","Saltb","Cat of the Canaly","Bets","The Blind Girh","The Ugly Little Girl","Mercedenl","Mercye"],"father":"","mother":"","spouse":"","allegiances":"House Stark of Winterfell","books":[],"povBooks":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Feast for Crows","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Maisie Williams"},{"url":"https://www.anapioficeandfire.com/api/characters/149","id":149,"name":"Arys Oakheart","gender":"Male","culture":"Reach","born":"At Old Oak","died":"In 300 AC, at the Greenblood","alive":false,"titles":"Ser","aliases":"","father":"","mother":"","spouse":"","allegiances":"House Oakheart of Old Oak","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Dance with Dragons"],"povBooks":"A Feast for Crows","tvSeries":"","playedBy":""},{"url":"https://www.anapioficeandfire.com/api/characters/150","id":150,"name":"Asha Greyjoy","gender":"Female","culture":"Ironborn","born":"In 275 AC or 276 AC, at Pyke","died":"","alive":true,"titles":["Princess","Captain of the Black Wind","Conqueror of Deepwood Motte"],"aliases":["Esgred","The Kraken's Daughter"],"father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/1372","allegiances":["House Greyjoy of Pyke","House Ironmaker"],"books":["A Game of Thrones","A Clash of Kings"],"povBooks":["A Feast for Crows","A Dance with Dragons"],"tvSeries":["Season 2","Season 3","Season 4"],"playedBy":"Gemma Whelan"},{"url":"https://www.anapioficeandfire.com/api/characters/168","id":168,"name":"Barristan Selmy","gender":"Male","culture":"Westeros","born":"In 237 AC","died":"","alive":true,"titles":["Ser","Hand of the Queen"],"aliases":["Barristan the Bold","Arstan Whitebeard","Ser Grandfather","Barristan the Old","Old Ser"],"father":"","mother":"","spouse":"","allegiances":["House Selmy of Harvest Hall","House Targaryen of King's Landing"],"books":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Feast for Crows","The World of Ice and Fire"],"povBooks":"A Dance with Dragons","tvSeries":["Season 1","Season 3","Season 4","Season 5"],"playedBy":"Ian McElhinney"},{"url":"https://www.anapioficeandfire.com/api/characters/2066","id":2066,"name":"Varamyr","gender":"Male","culture":"Free Folk","born":"At a village Beyond the Wall","died":"In 300 AC, at a village Beyond the Wall","alive":false,"titles":"","aliases":["Varamyr Sixskins","Haggon","Lump"],"father":"","mother":"","spouse":"","allegiances":[],"books":"A Storm of Swords","povBooks":"A Dance with Dragons","tvSeries":"","playedBy":""},{"url":"https://www.anapioficeandfire.com/api/characters/208","id":208,"name":"Brandon Stark","gender":"Male","culture":"Northmen","born":"In 290 AC, at Winterfell","died":"","alive":true,"titles":"Prince of Winterfell","aliases":["Bran","Bran the Broken","The Winged Wolf"],"father":"","mother":"","spouse":"","allegiances":"House Stark of Winterfell","books":"A Feast for Crows","povBooks":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 6"],"playedBy":"Isaac Hempstead-Wright"},{"url":"https://www.anapioficeandfire.com/api/characters/216","id":216,"name":"Brienne of Tarth","gender":"Female","culture":"","born":"In 280 AC","died":"","alive":true,"titles":"","aliases":["The Maid of Tarth","Brienne the Beauty","Brienne the Blue"],"father":"","mother":"","spouse":"","allegiances":["House Baratheon of Storm's End","House Stark of Winterfell","House Tarth of Evenfall Hall"],"books":["A Clash of Kings","A Storm of Swords","A Dance with Dragons"],"povBooks":"A Feast for Crows","tvSeries":["Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Gwendoline Christie"},{"url":"https://www.anapioficeandfire.com/api/characters/232","id":232,"name":"Catelyn Stark","gender":"Female","culture":"Rivermen","born":"In 264 AC, at Riverrun","died":"In 299 AC, at the Twins","alive":false,"titles":"Lady of Winterfell","aliases":["Catelyn Tully","Lady Stoneheart","The Silent Sistet","Mother Mercilesr","The Hangwomans"],"father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/339","allegiances":["House Stark of Winterfell","House Tully of Riverrun"],"books":["A Feast for Crows","A Dance with Dragons"],"povBooks":["A Game of Thrones","A Clash of Kings","A Storm of Swords"],"tvSeries":["Season 1","Season 2","Season 3"],"playedBy":"Michelle Fairley"},{"url":"https://www.anapioficeandfire.com/api/characters/238","id":238,"name":"Cersei Lannister","gender":"Female","culture":"Westerman","born":"In 266 AC, at Casterly Rock","died":"","alive":true,"titles":["Light of the West","Queen Dowager","Protector of the Realm","Lady of Casterly Rock","Queen Regent"],"aliases":[],"father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/901","allegiances":"House Lannister of Casterly Rock","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords"],"povBooks":["A Feast for Crows","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Lena Headey"},{"url":"https://www.anapioficeandfire.com/api/characters/339","id":339,"name":"Eddard Stark","gender":"Male","culture":"Northmen","born":"In 263 AC, at Winterfell","died":"In 299 AC, at Great Sept of Baelor in King's Landing","alive":false,"titles":["Lord of Winterfell","Warden of the North","Hand of the King","Protector of the Realm","Regent"],"aliases":["Ned","The Ned","The Quiet Wolf"],"father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/232","allegiances":"House Stark of Winterfell","books":["A Clash of Kings","A Storm of Swords","A Feast for Crows","A Dance with Dragons","The World of Ice and Fire"],"povBooks":"A Game of Thrones","tvSeries":["Season 1","Season 6"],"playedBy":["Sean Bean","Sebastian Croft","Robert Aramayo"]},{"url":"https://www.anapioficeandfire.com/api/characters/529","id":529,"name":"Jaime Lannister","gender":"Male","culture":"Westerlands","born":"In 266 AC, at Casterly Rock","died":"","alive":true,"titles":["Ser","Lord Commander of the Kingsguard","Warden of the East (formerly)"],"aliases":["The Kingslayer","The Lion of Lannister","The Young Lion","Cripple"],"father":"","mother":"","spouse":"","allegiances":"House Lannister of Casterly Rock","books":["A Game of Thrones","A Clash of Kings"],"povBooks":["A Storm of Swords","A Feast for Crows","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5"],"playedBy":"Nikolaj Coster-Waldau"},{"url":"https://www.anapioficeandfire.com/api/characters/576","id":576,"name":"Jon Connington","gender":"Male","culture":"Stormlands","born":"In or between 263 AC and 265 AC","died":"","alive":true,"titles":["Lord of Griffin's Roost","Hand of the King","Hand of the True King"],"aliases":"Griffthe Mad King's Hand","father":"","mother":"","spouse":"","allegiances":["House Connington of Griffin's Roost","House Targaryen of King's Landing"],"books":["A Storm of Swords","A Feast for Crows","The World of Ice and Fire"],"povBooks":"A Dance with Dragons","tvSeries":"","playedBy":""},{"url":"https://www.anapioficeandfire.com/api/characters/583","id":583,"name":"Jon Snow","gender":"Male","culture":"Northmen","born":"In 283 AC","died":"","alive":true,"titles":"Lord Commander of the Night's Watch","aliases":["Lord Snow","Ned Stark's Bastard","The Snow of Winterfell","The Crow-Come-Over","The 998th Lord Commander of the Night's Watch","The Bastard of Winterfell","The Black Bastard of the Wall","Lord Crow"],"father":"","mother":"","spouse":"","allegiances":"House Stark of Winterfell","books":"A Feast for Crows","povBooks":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Kit Harington"},{"url":"https://www.anapioficeandfire.com/api/characters/60","id":60,"name":"Aeron Greyjoy","gender":"Male","culture":"Ironborn","born":"In or between 269 AC and 273 AC, at Pyke","died":"","alive":true,"titles":["Priest of the Drowned God","Captain of the Golden Storm (formerly)"],"aliases":["The Damphair","Aeron Damphair"],"father":"","mother":"","spouse":"","allegiances":"House Greyjoy of Pyke","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Dance with Dragons"],"povBooks":"A Feast for Crows","tvSeries":"Season 6","playedBy":"Michael Feast"},{"url":"https://www.anapioficeandfire.com/api/characters/605","id":605,"name":"Kevan Lannister","gender":"Male","culture":"","born":"In 244 AC","died":"In 300 AC, at King's Landing","alive":false,"titles":["Ser","Master of laws","Lord Regent","Protector of the Realm"],"aliases":"","father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/327","allegiances":"House Lannister of Casterly Rock","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Feast for Crows"],"povBooks":"A Dance with Dragons","tvSeries":["Season 1","Season 2","Season 5","Season 6"],"playedBy":"Ian Gelder"},{"url":"https://www.anapioficeandfire.com/api/characters/743","id":743,"name":"Melisandre","gender":"Female","culture":"Asshai","born":"At Unknown","died":"","alive":true,"titles":"","aliases":["The Red Priestess","The Red Woman","The King's Red Shadow","Lady Red","Lot Seven"],"father":"","mother":"","spouse":"","allegiances":[],"books":["A Clash of Kings","A Storm of Swords","A Feast for Crows"],"povBooks":"A Dance with Dragons","tvSeries":["Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Carice van Houten"},{"url":"https://www.anapioficeandfire.com/api/characters/751","id":751,"name":"Merrett Frey","gender":"Male","culture":"Rivermen","born":"In 262 AC","died":"In 300 AC, at Near Oldstones","alive":false,"titles":"","aliases":"Merrett Muttonhead","father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/712","allegiances":"House Frey of the Crossing","books":["A Game of Thrones","A Clash of Kings","A Feast for Crows","A Dance with Dragons"],"povBooks":"A Storm of Swords","tvSeries":"","playedBy":""},{"url":"https://www.anapioficeandfire.com/api/characters/844","id":844,"name":"Quentyn Martell","gender":"Male","culture":"Dornish","born":"In 281 AC, at Sunspear, Dorne","died":"In 300 AC, at Meereen","alive":false,"titles":"Prince","aliases":["Frog","Prince Frog","The prince who came too late","The Dragonrider"],"father":"","mother":"","spouse":"","allegiances":"House Nymeros Martell of Sunspear","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Feast for Crows"],"povBooks":"A Dance with Dragons","tvSeries":"","playedBy":""},{"url":"https://www.anapioficeandfire.com/api/characters/954","id":954,"name":"Samwell Tarly","gender":"Male","culture":"Andal","born":"In 283 AC, at Horn Hill","died":"","alive":true,"titles":"","aliases":["Sam","Ser Piggy","Prince Pork-chop","Lady Piggy","Sam the Slayer","Black Sam","Lord of Ham"],"father":"","mother":"","spouse":"","allegiances":"House Tarly of Horn Hill","books":["A Game of Thrones","A Clash of Kings","A Dance with Dragons"],"povBooks":["A Storm of Swords","A Feast for Crows"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"John Bradley-West"},{"url":"https://www.anapioficeandfire.com/api/characters/957","id":957,"name":"Sansa Stark","gender":"Female","culture":"Northmen","born":"In 286 AC, at Winterfell","died":"","alive":true,"titles":"Princess","aliases":["Little bird","Alayne Stone","Jonquil"],"father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/1052","allegiances":["House Baelish of Harrenhal","House Stark of Winterfell"],"books":"A Dance with Dragons","povBooks":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Feast for Crows"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Sophie Turner"}],"options":{"mode":"tree","modes":["code","form","text","tree","view"]}},"evals":[],"jsHooks":[]}</script>
+
+---
+
+
+# Wrangling Lists
+
+Suppose we wanted only the first 5 characters in the `got_chars` list?
+
+--
+
+```r
+got_chars[1:5] %&gt;% 
+  str(max.level = 1)
+```
+
+```
+## List of 5
+##  $ :List of 18
+##  $ :List of 18
+##  $ :List of 18
+##  $ :List of 18
+##  $ :List of 18
+```
+
+---
+
+
+# Wrangling Lists
+
+Now, suppose that we just want to look at the name of the first 5 characters. Who remembers how to do this in base R?
+
+--
+
+You might think that `got_chars[[1:5]]$name` would do the trick...
+
+
+```r
+got_chars[[1:5]]$name
+```
+
+```
+## Error in got_chars[[1:5]]: recursive indexing failed at level 3
+```
+
+Nope. 
+
+---
+
+# Wrangling lists
+
+suppose that we jut want to look at the name of the first 5 characters. 
+
+`purrr` to the rescue!
+
+
+```r
+got_chars[1:5] %&gt;%
+  map_chr('name')
+```
+
+```
+## [1] "Theon Greyjoy"     "Tyrion Lannister"  "Victarion Greyjoy"
+## [4] "Will"              "Areo Hotah"
+```
+
+---
+
+# Wrangling Lists - going deeper
+
+Let's say you've got a list that goes a little deeper, and now has lists inside of lists. Suppose that we want to extract the elements in the deepest level of this list.
+
+Passing a string to map is basically a "map" of what to get
+
+
+```r
+thing &lt;- list(list(y = 2, z = list(w = 'hello')),
+              list(y = 2, z = list(w = 'world')))
+
+map_chr(thing, c("z","w"))
+```
+
+```
+## [1] "hello" "world"
+```
+
+
+---
+
+# Wrangling Lists
+
+Let's got back to the Got, and first add names to each list element.
+
+Remember that `.` refers to the objected passed to function through the pipe
+
+
+```r
+got_chars[1:5] %&gt;%
+  purrr::set_names(map_chr(.,'name')) %&gt;%
+  listviewer::jsonedit()
+```
+
+<div id="htmlwidget-466358a46d1399716e82" style="width:684px;height:396px;" class="jsonedit html-widget"></div>
+<script type="application/json" data-for="htmlwidget-466358a46d1399716e82">{"x":{"data":{"Theon Greyjoy":{"url":"https://www.anapioficeandfire.com/api/characters/1022","id":1022,"name":"Theon Greyjoy","gender":"Male","culture":"Ironborn","born":"In 278 AC or 279 AC, at Pyke","died":"","alive":true,"titles":["Prince of Winterfell","Captain of Sea Bitch","Lord of the Iron Islands (by law of the green lands)"],"aliases":["Prince of Fools","Theon Turncloak","Reek","Theon Kinslayer"],"father":"","mother":"","spouse":"","allegiances":"House Greyjoy of Pyke","books":["A Game of Thrones","A Storm of Swords","A Feast for Crows"],"povBooks":["A Clash of Kings","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Alfie Allen"},"Tyrion Lannister":{"url":"https://www.anapioficeandfire.com/api/characters/1052","id":1052,"name":"Tyrion Lannister","gender":"Male","culture":"","born":"In 273 AC, at Casterly Rock","died":"","alive":true,"titles":["Acting Hand of the King (former)","Master of Coin (former)"],"aliases":["The Imp","Halfman","The boyman","Giant of Lannister","Lord Tywin's Doom","Lord Tywin's Bane","Yollo","Hugor Hill","No-Nose","Freak","Dwarf"],"father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/2044","allegiances":"House Lannister of Casterly Rock","books":["A Feast for Crows","The World of Ice and Fire"],"povBooks":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Peter Dinklage"},"Victarion Greyjoy":{"url":"https://www.anapioficeandfire.com/api/characters/1074","id":1074,"name":"Victarion Greyjoy","gender":"Male","culture":"Ironborn","born":"In 268 AC or before, at Pyke","died":"","alive":true,"titles":["Lord Captain of the Iron Fleet","Master of the Iron Victory"],"aliases":"The Iron Captain","father":"","mother":"","spouse":"","allegiances":"House Greyjoy of Pyke","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords"],"povBooks":["A Feast for Crows","A Dance with Dragons"],"tvSeries":"","playedBy":""},"Will":{"url":"https://www.anapioficeandfire.com/api/characters/1109","id":1109,"name":"Will","gender":"Male","culture":"","born":"","died":"In 297 AC, at Haunted Forest","alive":false,"titles":"","aliases":"","father":"","mother":"","spouse":"","allegiances":[],"books":"A Clash of Kings","povBooks":"A Game of Thrones","tvSeries":"","playedBy":"Bronson Webb"},"Areo Hotah":{"url":"https://www.anapioficeandfire.com/api/characters/1166","id":1166,"name":"Areo Hotah","gender":"Male","culture":"Norvoshi","born":"In 257 AC or before, at Norvos","died":"","alive":true,"titles":"Captain of the Guard at Sunspear","aliases":"","father":"","mother":"","spouse":"","allegiances":"House Nymeros Martell of Sunspear","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords"],"povBooks":["A Feast for Crows","A Dance with Dragons"],"tvSeries":["Season 5","Season 6"],"playedBy":"DeObia Oparei"}},"options":{"mode":"tree","modes":["code","form","text","tree","view"]}},"evals":[],"jsHooks":[]}</script>
+
+
+---
+
+
+# Wrangling Lists
+
+How can we get both the name and allegiance of each character?
+
+Will this work?
+
+
+```r
+got_chars[1:5] %&gt;%
+  map(c('name','allegiances')) 
+```
+
+--
+
+
+```
+## [[1]]
+## NULL
+## 
+## [[2]]
+## NULL
+## 
+## [[3]]
+## NULL
+## 
+## [[4]]
+## NULL
+## 
+## [[5]]
+## NULL
+```
+
+---
+
+# Wrangling lists
+
+Remember, everything in R is a function!
+
+What does this do?
+
+
+```r
+`[`(mtcars,c("mpg","cyl"))
+```
+
+--
+
+
+```
+##                 mpg cyl
+## Mazda RX4      21.0   6
+## Mazda RX4 Wag  21.0   6
+## Datsun 710     22.8   4
+## Hornet 4 Drive 21.4   6
+```
+
+
+`[` is a function!
+
+
+---
+
+# Wrangling Lists
+
+How can we get both the name and allegiance of each character?
+
+
+```r
+got_chars[1:5] %&gt;%
+  map(`[`, c('name', 'allegiances'))
+```
+
+```
+## [[1]]
+## [[1]]$name
+## [1] "Theon Greyjoy"
+## 
+## [[1]]$allegiances
+## [1] "House Greyjoy of Pyke"
+## 
+## 
+## [[2]]
+## [[2]]$name
+## [1] "Tyrion Lannister"
+## 
+## [[2]]$allegiances
+## [1] "House Lannister of Casterly Rock"
+## 
+## 
+## [[3]]
+## [[3]]$name
+## [1] "Victarion Greyjoy"
+## 
+## [[3]]$allegiances
+## [1] "House Greyjoy of Pyke"
+## 
+## 
+## [[4]]
+## [[4]]$name
+## [1] "Will"
+## 
+## [[4]]$allegiances
+## list()
+## 
+## 
+## [[5]]
+## [[5]]$name
+## [1] "Areo Hotah"
+## 
+## [[5]]$allegiances
+## [1] "House Nymeros Martell of Sunspear"
+```
+
+
+---
+
+# Wrangling Lists
+
+Putting things together, now suppose that we want to find all the Lanisters in the GoT list
+
+
+
+```r
+names &lt;- map_chr(got_chars, "name")
+
+is_lannister &lt;- map_lgl(names,~ stringr::str_detect(.x, "Lannister"))
+
+got_chars %&gt;% 
+  purrr::set_names(names) %&gt;% 
+  keep(is_lannister) %&gt;% 
+  listviewer::jsonedit()
+```
+
+<div id="htmlwidget-28581aa3e4de6c04d3a1" style="width:684px;height:396px;" class="jsonedit html-widget"></div>
+<script type="application/json" data-for="htmlwidget-28581aa3e4de6c04d3a1">{"x":{"data":{"Tyrion Lannister":{"url":"https://www.anapioficeandfire.com/api/characters/1052","id":1052,"name":"Tyrion Lannister","gender":"Male","culture":"","born":"In 273 AC, at Casterly Rock","died":"","alive":true,"titles":["Acting Hand of the King (former)","Master of Coin (former)"],"aliases":["The Imp","Halfman","The boyman","Giant of Lannister","Lord Tywin's Doom","Lord Tywin's Bane","Yollo","Hugor Hill","No-Nose","Freak","Dwarf"],"father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/2044","allegiances":"House Lannister of Casterly Rock","books":["A Feast for Crows","The World of Ice and Fire"],"povBooks":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Peter Dinklage"},"Cersei Lannister":{"url":"https://www.anapioficeandfire.com/api/characters/238","id":238,"name":"Cersei Lannister","gender":"Female","culture":"Westerman","born":"In 266 AC, at Casterly Rock","died":"","alive":true,"titles":["Light of the West","Queen Dowager","Protector of the Realm","Lady of Casterly Rock","Queen Regent"],"aliases":[],"father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/901","allegiances":"House Lannister of Casterly Rock","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords"],"povBooks":["A Feast for Crows","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5","Season 6"],"playedBy":"Lena Headey"},"Jaime Lannister":{"url":"https://www.anapioficeandfire.com/api/characters/529","id":529,"name":"Jaime Lannister","gender":"Male","culture":"Westerlands","born":"In 266 AC, at Casterly Rock","died":"","alive":true,"titles":["Ser","Lord Commander of the Kingsguard","Warden of the East (formerly)"],"aliases":["The Kingslayer","The Lion of Lannister","The Young Lion","Cripple"],"father":"","mother":"","spouse":"","allegiances":"House Lannister of Casterly Rock","books":["A Game of Thrones","A Clash of Kings"],"povBooks":["A Storm of Swords","A Feast for Crows","A Dance with Dragons"],"tvSeries":["Season 1","Season 2","Season 3","Season 4","Season 5"],"playedBy":"Nikolaj Coster-Waldau"},"Kevan Lannister":{"url":"https://www.anapioficeandfire.com/api/characters/605","id":605,"name":"Kevan Lannister","gender":"Male","culture":"","born":"In 244 AC","died":"In 300 AC, at King's Landing","alive":false,"titles":["Ser","Master of laws","Lord Regent","Protector of the Realm"],"aliases":"","father":"","mother":"","spouse":"https://www.anapioficeandfire.com/api/characters/327","allegiances":"House Lannister of Casterly Rock","books":["A Game of Thrones","A Clash of Kings","A Storm of Swords","A Feast for Crows"],"povBooks":"A Dance with Dragons","tvSeries":["Season 1","Season 2","Season 5","Season 6"],"playedBy":"Ian Gelder"}},"options":{"mode":"tree","modes":["code","form","text","tree","view"]}},"evals":[],"jsHooks":[]}</script>
+
+---
+
+# Using `purrr` for Analysis
+
+purrr is probably one of my most commonly used packages. In fisheries, we constantly have to for example fit lots of different models to lots of different data and synthesize and compare results. purrr is great for this! 
+
+Let's walk through an example using `gampinder` of using purrr + other tidy functions to analyze relationships between life expectancy and per capita GDP. 
+
+
+---
+
+# List columns
+
+Let's go back to dataframe world for a bit. Lists allow you to store very complex data structures, but the human brain is much better at thinking in 2D, and it makes organization much easier. 
+
+`tibbles` let you store lists in side dataframe columns! Handy for any time you want to organize a complex result (like a regression) in a dataframe. 
+
+
+```r
+got_frame &lt;- tibble(name = map_chr(got_chars,"name"),
+       info = got_chars)
+
+got_frame %&gt;% 
+  head(3)
+```
+
+```
+## # A tibble: 3 x 2
+##   name              info             
+##   &lt;chr&gt;             &lt;list&gt;           
+## 1 Theon Greyjoy     &lt;named list [18]&gt;
+## 2 Tyrion Lannister  &lt;named list [18]&gt;
+## 3 Victarion Greyjoy &lt;named list [18]&gt;
+```
+
+---
+
+# nest/unnest
+
+Let's dive deeper into list columns using the nest/unnest functions from purrr
+
+nest basically collapses all ungroup data into a new column
+
+
+```r
+gapminder %&gt;% 
+  group_by(country) %&gt;% 
+  nest() %&gt;% 
+  head(3)
+```
+
+```
+## # A tibble: 3 x 2
+## # Groups:   country [142]
+##   country               data
+##   &lt;fct&gt;       &lt;list&lt;df[,5]&gt;&gt;
+## 1 Afghanistan       [12 × 5]
+## 2 Albania           [12 × 5]
+## 3 Algeria           [12 × 5]
+```
+
+
+---
+
+# nest
+
+Why is this handy / any better than group_by then summarize?
+
+Summarize is great if you want to get one thing back, but suppose you want to return a complex object like a regression for each object. 
+
+
+```r
+gapminder %&gt;% 
+  group_by(country) %&gt;% 
+  nest() %&gt;% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %&gt;% 
+  head(3)
+```
+
+```
+## # A tibble: 3 x 3
+## # Groups:   country [142]
+##   country               data foo_model
+##   &lt;fct&gt;       &lt;list&lt;df[,5]&gt;&gt; &lt;list&gt;   
+## 1 Afghanistan       [12 × 5] &lt;lm&gt;     
+## 2 Albania           [12 × 5] &lt;lm&gt;     
+## 3 Algeria           [12 × 5] &lt;lm&gt;
+```
+
+---
+
+# unnest
+
+So in a few lines of code we've neatly fit and stored regressions by continent! Now suppose we want to examine the distribution of per capita GDP coefficients. We can use `broom::tidy` to make a tidy dataframe of the regression outputs. 
+
+
+
+```r
+gapminder %&gt;% 
+  group_by(country) %&gt;% 
+  nest() %&gt;% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %&gt;% 
+  mutate(foo_coefs = map(foo_model, broom::tidy)) %&gt;% 
+  head(3)
+```
+
+```
+## # A tibble: 3 x 4
+## # Groups:   country [142]
+##   country               data foo_model foo_coefs       
+##   &lt;fct&gt;       &lt;list&lt;df[,5]&gt;&gt; &lt;list&gt;    &lt;list&gt;          
+## 1 Afghanistan       [12 × 5] &lt;lm&gt;      &lt;tibble [2 × 5]&gt;
+## 2 Albania           [12 × 5] &lt;lm&gt;      &lt;tibble [2 × 5]&gt;
+## 3 Algeria           [12 × 5] &lt;lm&gt;      &lt;tibble [2 × 5]&gt;
+```
+
+---
+
+# unnest
+
+And then use unnest to get things back in a handy format for plotting!
+
+
+```r
+gapminder %&gt;% 
+  group_by(country) %&gt;% 
+  nest() %&gt;% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %&gt;% 
+  mutate(foo_coefs = map(foo_model, broom::tidy)) %&gt;% 
+  unnest(cols = foo_coefs) %&gt;% 
+  head(4)
+```
+
+```
+## # A tibble: 4 x 8
+## # Groups:   country [142]
+##   country        data foo_model term   estimate std.error statistic p.value
+##   &lt;fct&gt;    &lt;list&lt;df[&gt; &lt;list&gt;    &lt;chr&gt;     &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;   &lt;dbl&gt;
+## 1 Afghani…   [12 × 5] &lt;lm&gt;      (Inte… 39.3     12.0          3.26  8.57e-3
+## 2 Afghani…   [12 × 5] &lt;lm&gt;      gdpPe… -0.00224  0.0149      -0.151 8.83e-1
+## 3 Albania    [12 × 5] &lt;lm&gt;      (Inte… 54.0      3.16        17.1   1.01e-8
+## 4 Albania    [12 × 5] &lt;lm&gt;      gdpPe…  0.00444  0.000917     4.84  6.82e-4
+```
+
+---
+
+# unnest
+
+
+
+```r
+gapminder %&gt;% 
+  group_by(country) %&gt;% 
+  nest() %&gt;% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %&gt;% 
+  mutate(foo_coefs = map(foo_model, broom::tidy)) %&gt;% 
+  unnest(cols = foo_coefs) %&gt;% 
+  filter(term == "gdpPercap") %&gt;% 
+  ggplot(aes(estimate)) + 
+  geom_histogram()
+```
+
+&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-28-1.svg" style="display: block; margin: auto;" /&gt;
+
+
+---
+
+# Putting it all together
+
+
+
+```r
+gapminder %&gt;% 
+  group_by(country, continent) %&gt;% 
+  nest() %&gt;% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %&gt;% 
+  mutate(foo_coefs = map(foo_model, broom::tidy)) %&gt;% 
+  unnest(cols = foo_coefs) %&gt;% 
+  filter(term == "gdpPercap") %&gt;% 
+  ggplot(aes(reorder(country, estimate),estimate, color = p.value &lt; 0.05)) + 
+  geom_hline(aes(yintercept = 0), linetype = 2) +
+  geom_point() + 
+  coord_flip() + 
+  facet_wrap(~continent, scales = "free_y") + 
+  scale_color_discrete(name = "Significant?") + 
+  scale_x_discrete(name = '') + 
+  theme_minimal() + 
+  theme(axis.text.y = element_text(size = 6))
+```
+
+---
+
+
+# Putting it all together
+
+
+&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-30-1.svg" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Going deeper
+
+
+Suppose we wanted to compare the out-of-sample predictive power of 
+
+log(y) ~ x and y ~ x. 
+
+Can't use straight AIC... but what is AIC? A measure of predictive power!
+
+Let's put the out-of-sample predictive power of the two models to the test. 
+
+---
+
+
+# Creating out-of-sample data
+
+Let's create a bunch of dataframes, each of which is missing one country
+
+
+
+```r
+gapminder &lt;- gapminder %&gt;% 
+  modify_if(is.factor, as.character)
+
+oob_data &lt;- tibble(omitted_country = unique(gapminder$country)) %&gt;% 
+  mutate(training_data = map(omitted_country,~filter(gapminder, country != .x)),
+         testing_data = map(omitted_country,~filter(gapminder, country == .x)))
+```
+
+---
+
+
+# Creating candidate models
+
+let's compare three different models
+
+
+
+```r
+cand_models &lt;-
+  c(
+    "log(lifeExp) ~ gdpPercap",
+    "lifeExp ~ gdpPercap",
+    "lifeExp ~ log(gdpPercap)",
+    "lifeExp ~ year + gdpPercap"
+  )
+```
+
+
+---
+
+# Creating Candidate Models
+
+And now we'll use tidyr::expand_grid to create factorial combinations of models and data
+
+
+```r
+model_sandbox &lt;- tidyr::expand_grid(omitted_country = oob_data$omitted_country,
+                                    model = cand_models) %&gt;% 
+  left_join(oob_data, by = "omitted_country")
+
+model_sandbox %&gt;% 
+  head(5)
+```
+
+```
+## # A tibble: 5 x 4
+##   omitted_country model                 training_data       testing_data   
+##   &lt;chr&gt;           &lt;chr&gt;                 &lt;list&gt;              &lt;list&gt;         
+## 1 Afghanistan     log(lifeExp) ~ gdpPe… &lt;tibble [1,692 × 6… &lt;tibble [12 × …
+## 2 Afghanistan     lifeExp ~ gdpPercap   &lt;tibble [1,692 × 6… &lt;tibble [12 × …
+## 3 Afghanistan     lifeExp ~ log(gdpPer… &lt;tibble [1,692 × 6… &lt;tibble [12 × …
+## 4 Afghanistan     lifeExp ~ year + gdp… &lt;tibble [1,692 × 6… &lt;tibble [12 × …
+## 5 Albania         log(lifeExp) ~ gdpPe… &lt;tibble [1,692 × 6… &lt;tibble [12 × …
+```
+
+
+---
+
+# And now we're back in familiar territory!
+
+
+
+```r
+test &lt;- model_sandbox %&gt;%
+  mutate(fitted_model = map2(model, training_data, ~ lm(.x, data = .y))) %&gt;%
+  mutate(predictions = map2(fitted_model, testing_data, ~ broom::augment(.x, newdata = .y))) %&gt;%
+  select(omitted_country, model, predictions) %&gt;%
+  unnest(cols = predictions) %&gt;%
+  mutate(log_reg = str_detect(model,	"log\\(lifeExp\\)"),
+         .fitted = ifelse(log_reg, exp(.fitted), .fitted)) %&gt;%
+  select(omitted_country, model, lifeExp, .fitted, log_reg, everything())
+
+
+head(test,2) 
+```
+
+```
+## # A tibble: 2 x 11
+##   omitted_country model lifeExp .fitted log_reg country continent  year
+##   &lt;chr&gt;           &lt;chr&gt;   &lt;dbl&gt;   &lt;dbl&gt; &lt;lgl&gt;   &lt;chr&gt;   &lt;chr&gt;     &lt;int&gt;
+## 1 Afghanistan     log(…    28.8    53.5 TRUE    Afghan… Asia       1952
+## 2 Afghanistan     log(…    30.3    53.6 TRUE    Afghan… Asia       1957
+## # … with 3 more variables: pop &lt;int&gt;, gdpPercap &lt;dbl&gt;, .se.fit &lt;dbl&gt;
+```
+
+
+---
+
+
+# Comparing Model Results
+
+.pull-left[
+
+```r
+test %&gt;%
+  ggplot(aes(lifeExp, pmin(100,.fitted), fill = model)) +
+  geom_abline(aes(slope = 1, intercept = 0)) +
+  geom_point(size = 4, shape = 21, alpha = 0.5)
+```
+] .pull-right[
+
+&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-36-1.svg" style="display: block; margin: auto;" /&gt;
+
+]
+---
+
+# Comparing Model Results
+
+
+
+```r
+test %&gt;% 
+  filter((.fitted - lifeExp) &gt; 25) %&gt;% 
+  select(omitted_country) %&gt;% 
+  unique()
+```
+
+```
+## # A tibble: 4 x 1
+##   omitted_country
+##   &lt;chr&gt;          
+## 1 Afghanistan    
+## 2 Angola         
+## 3 Kuwait         
+## 4 Rwanda
+```
+
+
+---
+
+# Comparing Model Results
+
+Let's use out-of-sample root-mean-squared-error to select our model
+.pull-left[
+
+```r
+test %&gt;% 
+  group_by(model) %&gt;% 
+  summarise(rmse = sqrt(mean((lifeExp - .fitted)^2))) %&gt;% 
+  ggplot(aes(reorder(model, rmse), rmse)) + 
+  geom_col() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+```
+] .pull-right[
+
+&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-39-1.svg" style="display: block; margin: auto;" /&gt;
+
+]
+
+
+---
+
+# purrr has lots of functions
+
+It's not just map...
+
+  - modify_
+    - change en element of a list in place
+  
+  - walk
+    - when all you want are the side effects
+  
+  - safely
+     - deals with failed elements
+
+---
+
+# modify
+
+
+```r
+gapminder
+```
+
+```
+## # A tibble: 1,704 x 6
+##    country     continent  year lifeExp      pop gdpPercap
+##    &lt;chr&gt;       &lt;chr&gt;     &lt;int&gt;   &lt;dbl&gt;    &lt;int&gt;     &lt;dbl&gt;
+##  1 Afghanistan Asia       1952    28.8  8425333      779.
+##  2 Afghanistan Asia       1957    30.3  9240934      821.
+##  3 Afghanistan Asia       1962    32.0 10267083      853.
+##  4 Afghanistan Asia       1967    34.0 11537966      836.
+##  5 Afghanistan Asia       1972    36.1 13079460      740.
+##  6 Afghanistan Asia       1977    38.4 14880372      786.
+##  7 Afghanistan Asia       1982    39.9 12881816      978.
+##  8 Afghanistan Asia       1987    40.8 13867957      852.
+##  9 Afghanistan Asia       1992    41.7 16317921      649.
+## 10 Afghanistan Asia       1997    41.8 22227415      635.
+## # … with 1,694 more rows
+```
+
+---
+
+# modify
+
+
+```r
+gapminder %&gt;% 
+  modify_if(is.factor, as.character)
+```
+
+```
+## # A tibble: 1,704 x 6
+##    country     continent  year lifeExp      pop gdpPercap
+##    &lt;chr&gt;       &lt;chr&gt;     &lt;int&gt;   &lt;dbl&gt;    &lt;int&gt;     &lt;dbl&gt;
+##  1 Afghanistan Asia       1952    28.8  8425333      779.
+##  2 Afghanistan Asia       1957    30.3  9240934      821.
+##  3 Afghanistan Asia       1962    32.0 10267083      853.
+##  4 Afghanistan Asia       1967    34.0 11537966      836.
+##  5 Afghanistan Asia       1972    36.1 13079460      740.
+##  6 Afghanistan Asia       1977    38.4 14880372      786.
+##  7 Afghanistan Asia       1982    39.9 12881816      978.
+##  8 Afghanistan Asia       1987    40.8 13867957      852.
+##  9 Afghanistan Asia       1992    41.7 16317921      649.
+## 10 Afghanistan Asia       1997    41.8 22227415      635.
+## # … with 1,694 more rows
+```
+
+
+---
+
+# walk
+
+
+```r
+file.create(here::here("functions","foo.R"))
+```
+
+```
+## [1] TRUE
+```
+
+```r
+file.create(here::here("functions","foo2.R"))
+```
+
+```
+## [1] TRUE
+```
+
+```r
+foos &lt;- list.files(here::here('functions'))
+
+foos &lt;- foos[str_detect(foos,"\\.R")]
+
+walk(foos, ~source(here::here("functions",.x)))
+```
+
+
+---
+
+# safely
+
+Safely is one of my most used functions. We all have those cases where our function works 99% of the time, but that 1% of the time breaks everything. Sometimes it's unavoidable (hi TMB)
+
+
+```r
+foo &lt;- function(x){
+  
+  if (x &gt; 0){
+    log(x)
+  } else
+  {
+    stop("Logging a negative!")
+  }
+  
+}
+
+test &lt;- tibble(things = rnorm(10)) %&gt;% 
+  mutate(food_thing = map(things,foo))
+```
+
+```
+## Error in .f(.x[[i]], ...): Logging a negative!
+```
+
+
+---
+
+# safely
+
+Wrap your function in `purrr::safely`
+
+
+```r
+test &lt;- tibble(things = rnorm(10)) %&gt;% 
+  mutate(food_thing = map(things,purrr::safely(foo)))
+
+test %&gt;% 
+  head(1)
+```
+
+```
+## # A tibble: 1 x 2
+##   things food_thing      
+##    &lt;dbl&gt; &lt;list&gt;          
+## 1   2.29 &lt;named list [2]&gt;
+```
+
+---
+
+# safely
+
+safely returns a list with two objects: the result of the function, and any error messages, one of which is always NULL (also, say hello to list columns!)
+
+
+```r
+test$food_thing[[1]]
+```
+
+```
+## $result
+## [1] 0.8270858
+## 
+## $error
+## NULL
+```
+
+---
+
+# safely
+
+We can keep using purrr to get only the entries that ran
+
+
+
+```r
+test %&gt;% 
+  mutate(errors = map(food_thing,"error")) %&gt;% 
+  mutate(worked = map_lgl(errors, is.null)) %&gt;% 
+  filter(worked) %&gt;% 
+  mutate(food_thing = map_dbl(food_thing,"result"))
+```
+
+```
+## # A tibble: 3 x 4
+##   things food_thing errors worked
+##    &lt;dbl&gt;      &lt;dbl&gt; &lt;list&gt; &lt;lgl&gt; 
+## 1  2.29       0.827 &lt;NULL&gt; TRUE  
+## 2  0.636     -0.453 &lt;NULL&gt; TRUE  
+## 3  1.32       0.278 &lt;NULL&gt; TRUE
+```
+
+
+---
+
+# Exercise - Use Catch to Predict Status
+
+Costello et al. 2012 used a regression of catch + life history to predict B/Bmsy
+
+Let's give it a try ourselves (in way fewer lines of code than the original)
+
+1. Load in data and tidy it up
+
+2. Test out some candidate regressions, select best
+
+3. Test regressions on actual out-of-sample prediction
+  - is "best" still best?
+
+---
+
+# Exercise - Use Catch to Predict Status
+
+
+Data are in `here::here("data","ram_timeseries.csv")`
+
+- Some variables from Costello et al. 2012
+
+  - catch/max(catch)
+  
+  - running catch / mean(catch)
+  
+  - lag1, lag2, lag3 catch
+  
+  - catch
+  
+  - age of fishery
+  
+  - isscaap species group
+  
+  - etc. 
+
+Hint: data are not tidy to start! check out [`rsample`](https://github.com/tidymodels/rsample) package
+
+---
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "zenburn",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

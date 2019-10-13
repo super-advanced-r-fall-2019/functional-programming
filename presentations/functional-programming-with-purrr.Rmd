@@ -1,0 +1,958 @@
+---
+title: Data Wrangling and Model Fitting using `purrr`
+subtitle: FSH 507
+author: "Dan Ovando"
+institute: "University of Washington"
+date: "`r Sys.Date()`"
+output:
+  xaringan::moon_reader:
+    css: ["default","default-fonts","pres-things.css"]
+    lib_dir: libs
+    nature:
+      highlightStyle: zenburn
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: "16:9"
+---
+
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache = FALSE,dev = "svg", fig.align = "center", fig.width = 9.5, fig.height = 5.5)
+
+
+set.seed(42)
+library(purrr)
+library(repurrrsive)
+library(stringr)
+library(gapminder)
+library(rsample)
+library(doParallel)
+library(tidyverse)
+library(stringr)
+
+
+pres_theme <- theme_minimal(
+  base_size = 22,
+  base_family = "Arial Narrow"
+) +
+  theme(axis.title = element_text())
+theme_set(pres_theme)
+
+ggplot(mtcars, aes(mpg)) + 
+  geom_histogram()
+
+```
+
+
+# Getting Started
+
+Full credit to Jenny Bryan's [excellent `purrr` tutorial](https://jennybc.github.io/purrr-tutorial/) for helping me learn `purrr` and providing the basis for the list-wrangling examples here , along with Hadley Wickham & Garret Grolemund's [R for Data Science](http://r4ds.had.co.nz). 
+
+My goal is to walk you through some of the concepts outlined in these (much better) resources
+
+Using `purrr` to...
+
+  - wrangle lists
+  
+  - nest and unnest tibbles
+  
+  - creating list objects
+  
+  - applying functions to tibble components
+
+---
+
+
+# Before anything else, `browser`
+
+`browser` will quickly becomes your best friend once you start using functional programming. 
+
+Calling `browser()` will stop execution of the R code where it is encountered, and drop the user into the environment where `browser` was encountered
+
+Let's you hop inside a function to see what's going on
+
+---
+
+# check out roxygen for documenting functions
+
+
+```{r}
+
+#' number of apples!
+#'
+#' @param x the number of things
+#' @param y the thing
+#'
+#' @return the number of things
+#' @export
+#'
+#' @examples
+#'
+#' foo(x = 2, y = "apples")
+apples <- function(x = 2, y = "apples"){
+  
+  paste(x,y)
+  
+}
+
+```
+
+
+
+---
+
+# Why `purrr`?
+
+`purrr` basically takes on many of the tasks of the `apply` suite in base R (plus lots of other stuff). Like much of `tidyverse`, more about making things easier than new features
+
+From [SO](https://stackoverflow.com/questions/45101045/why-use-purrrmap-instead-of-lapply)
+
+.small[
+- The first argument to lapply() is the data; the first argument to mapply() is the function. The first argument to all map functions is always the data.
+
+- With vapply(), sapply(), and mapply() you can choose to suppress names on the output with USE.NAMES = FALSE; but lapply() doesn't have that argument.
+
+- There's no consistent way to pass consistent arguments on to the mapper function. Most functions use ... but mapply() uses MoreArgs (which you'd expect to be called MORE.ARGS), and Map(), Filter() and Reduce() expect you to create a new anonymous function. In map functions, constant argument always come after the function name.
+
+- Almost every purrr function is type stable: you can predict the output type exclusively from the function name. This is not true for sapply() or mapply(). Yes, there is vapply(); but there's no equivalent for mapply().
+]
+
+.center[**It's good to know how to use apply as well**]
+
+---
+
+# Basics of `purrr`
+
+.pull-left[
+
+What do we mean by applying functions?
+
+Take this simple example: print the string length of 5 shades
+
+].pull-right[
+
+```{r}
+
+shades <- colors()[1:5]
+
+for (i in seq_along(shades)){
+  
+  print(stringr::str_length(shades[i]))
+  
+}
+
+```
+]
+
+---
+
+
+#  Apply solution
+
+.pull-left[
+
+```{r}
+
+  lapply(shades, str_length)
+
+```
+]
+.pull-right[
+
+```{r}
+
+ purrr::map(shades, str_length)
+
+```
+
+
+]
+
+---
+
+# Key `purrr` verbs
+
+.pull-left[
+
+`map` is the workhorse of the `purrr` family. It is basically `apply`
+
+  - The basic syntax works in the manner 
+
+  - `map("Lists to apply function to","Function to apply across lists","Additional parameters")`
+
+Since a dataframe is a special class of a list, we can `map` through each element (column in this case) of say `mtcars`
+] 
+.pull-right[
+```{r}
+
+map(mtcars, mean, na.rm = T)
+
+```
+]
+
+---
+
+# Basics of `purrr`
+
+`map` by default returns a list. One nice feature of `map` and `purrr` is that we can specify the kind of output we want. 
+
+  - `map_TYPE` returns an object of class TYPE, e.g.
+
+    - `map_lgl` returns logical objects
+
+    - `map_df` returns data frames, etc.
+    
+
+```{r}
+map_df(mtcars, mean, na.rm = T)
+```
+
+
+---
+
+# Basics of `purrr`
+
+`map` can also be extended to deal with multiple input lists
+
+  - `map` applies a function over one list.
+
+  - `map2` applies a function over combinations of two lists in the form
+
+    - `map2(list1, list2, ~function(.x,.y), ...)`
+    
+  - `pmap` applies a function to arbitraty numbers of lists
+    - `pmap(list(a = a, b = b, c = d), function(a,b,c))`
+
+So, we can use `map2_chr` to map over two objects, apply a function, and return a character vector
+
+```{r}
+
+map2_chr(c('one','two','red','blue'), c('fish'), paste)
+
+```
+
+
+---
+
+# Multiple lists using `pmap`
+
+```{r}
+
+dmonds <- diamonds %>% 
+  slice(1:4)
+
+pmap_foo <- function(list1, list2 , list3){
+  
+  paste0("Diamond #", list1, " sold for $", list2,
+         " and was ", list3, " carats")
+  
+}
+
+pmap_chr(list(list1 = 1:nrow(dmonds), 
+              list2 = dmonds$price, 
+              list3 = dmonds$carat), 
+         pmap_foo)
+
+```
+
+---
+
+
+# Exercise: Finding NAs
+
+Use `purrr` to find rows that have entries for both x and y (no using na.omit!)
+
+
+```{r, echo=FALSE}
+
+x <- c(1,5,NA,NA,2,3)
+
+y <-  c(NA, 1, 6.3, NA,NA, 3)
+
+z <-  data_frame(x = x, y = y)
+
+knitr::kable(z, format = "html")
+```
+
+
+---
+
+# Wrangling Lists
+
+.pull-left[
+We often treat R like fancy excel: Store data and apply functions in two dimensions
+
+Getting used to wrangling lists opens up lots of possibilities in R
+
+Let's start with the Game of Thrones database in the `repurrrsive` package (thanks again to [Jenny Bryan](https://github.com/jennybc/repurrrsive)). 
+
+`got_chars` is a list containing a bunch of information on GoT characters with a "point of view" chapter in the first few books. 
+
+]
+.pull-right[
+
+```{r}
+
+str(got_chars, list.len =  3)
+
+```
+]
+
+---
+
+# Wrangling Lists
+
+```{r}
+
+listviewer::jsonedit(got_chars)
+
+```
+
+---
+
+
+# Wrangling Lists
+
+Suppose we wanted only the first 5 characters in the `got_chars` list?
+
+--
+```{r}
+
+got_chars[1:5] %>% 
+  str(max.level = 1)
+
+```
+
+---
+
+
+# Wrangling Lists
+
+Now, suppose that we just want to look at the name of the first 5 characters. Who remembers how to do this in base R?
+
+--
+
+You might think that `got_chars[[1:5]]$name` would do the trick...
+
+```{r, error = T}
+got_chars[[1:5]]$name
+```
+
+Nope. 
+
+---
+
+# Wrangling lists
+
+suppose that we jut want to look at the name of the first 5 characters. 
+
+`purrr` to the rescue!
+
+```{r}
+
+got_chars[1:5] %>%
+  map_chr('name')
+
+```
+
+---
+
+# Wrangling Lists - going deeper
+
+Let's say you've got a list that goes a little deeper, and now has lists inside of lists. Suppose that we want to extract the elements in the deepest level of this list.
+
+Passing a string to map is basically a "map" of what to get
+
+```{r}
+
+thing <- list(list(y = 2, z = list(w = 'hello')),
+              list(y = 2, z = list(w = 'world')))
+
+map_chr(thing, c("z","w"))
+
+```
+
+
+---
+
+# Wrangling Lists
+
+Let's got back to the Got, and first add names to each list element.
+
+Remember that `.` refers to the objected passed to function through the pipe
+
+```{r}
+
+got_chars[1:5] %>%
+  purrr::set_names(map_chr(.,'name')) %>%
+  listviewer::jsonedit()
+
+```
+
+
+---
+
+
+# Wrangling Lists
+
+How can we get both the name and allegiance of each character?
+
+Will this work?
+
+```{r, eval = FALSE}
+got_chars[1:5] %>%
+  map(c('name','allegiances')) 
+
+```
+
+--
+
+```{r, echo=FALSE}
+got_chars[1:5] %>%
+  map(c('name','allegiances')) 
+
+```
+
+---
+
+# Wrangling lists
+
+Remember, everything in R is a function!
+
+What does this do?
+
+```{r eval = FALSE}
+
+`[`(mtcars,c("mpg","cyl"))
+
+```
+
+--
+
+```{r, echo = FALSE}
+
+`[`(mtcars,c("mpg","cyl")) %>% 
+  head(4)
+
+```
+
+
+`[` is a function!
+
+
+---
+
+# Wrangling Lists
+
+How can we get both the name and allegiance of each character?
+
+```{r}
+got_chars[1:5] %>%
+  map(`[`, c('name', 'allegiances'))
+```
+
+
+---
+
+# Wrangling Lists
+
+Putting things together, now suppose that we want to find all the Lanisters in the GoT list
+
+
+```{r}
+
+names <- map_chr(got_chars, "name")
+
+is_lannister <- map_lgl(names,~ stringr::str_detect(.x, "Lannister"))
+
+got_chars %>% 
+  purrr::set_names(names) %>% 
+  keep(is_lannister) %>% 
+  listviewer::jsonedit()
+
+
+```
+
+---
+
+# Using `purrr` for Analysis
+
+purrr is probably one of my most commonly used packages. In fisheries, we constantly have to for example fit lots of different models to lots of different data and synthesize and compare results. purrr is great for this! 
+
+Let's walk through an example using `gampinder` of using purrr + other tidy functions to analyze relationships between life expectancy and per capita GDP. 
+
+
+---
+
+# List columns
+
+Let's go back to dataframe world for a bit. Lists allow you to store very complex data structures, but the human brain is much better at thinking in 2D, and it makes organization much easier. 
+
+`tibbles` let you store lists in side dataframe columns! Handy for any time you want to organize a complex result (like a regression) in a dataframe. 
+
+```{r}
+got_frame <- tibble(name = map_chr(got_chars,"name"),
+       info = got_chars)
+
+got_frame %>% 
+  head(3)
+
+```
+
+---
+
+# nest/unnest
+
+Let's dive deeper into list columns using the nest/unnest functions from purrr
+
+nest basically collapses all ungroup data into a new column
+
+```{r}
+
+gapminder %>% 
+  group_by(country) %>% 
+  nest() %>% 
+  head(3)
+
+```
+
+
+---
+
+# nest
+
+Why is this handy / any better than group_by then summarize?
+
+Summarize is great if you want to get one thing back, but suppose you want to return a complex object like a regression for each object. 
+
+```{r}
+
+gapminder %>% 
+  group_by(country) %>% 
+  nest() %>% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %>% 
+  head(3)
+
+```
+
+---
+
+# unnest
+
+So in a few lines of code we've neatly fit and stored regressions by continent! Now suppose we want to examine the distribution of per capita GDP coefficients. We can use `broom::tidy` to make a tidy dataframe of the regression outputs. 
+
+
+```{r}
+
+gapminder %>% 
+  group_by(country) %>% 
+  nest() %>% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %>% 
+  mutate(foo_coefs = map(foo_model, broom::tidy)) %>% 
+  head(3)
+
+```
+
+---
+
+# unnest
+
+And then use unnest to get things back in a handy format for plotting!
+
+```{r}
+gapminder %>% 
+  group_by(country) %>% 
+  nest() %>% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %>% 
+  mutate(foo_coefs = map(foo_model, broom::tidy)) %>% 
+  unnest(cols = foo_coefs) %>% 
+  head(4)
+```
+
+---
+
+# unnest
+
+
+```{r, fig.height=2}
+gapminder %>% 
+  group_by(country) %>% 
+  nest() %>% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %>% 
+  mutate(foo_coefs = map(foo_model, broom::tidy)) %>% 
+  unnest(cols = foo_coefs) %>% 
+  filter(term == "gdpPercap") %>% 
+  ggplot(aes(estimate)) + 
+  geom_histogram()
+```
+
+
+---
+
+# Putting it all together
+
+
+```{r, eval = FALSE}
+gapminder %>% 
+  group_by(country, continent) %>% 
+  nest() %>% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %>% 
+  mutate(foo_coefs = map(foo_model, broom::tidy)) %>% 
+  unnest(cols = foo_coefs) %>% 
+  filter(term == "gdpPercap") %>% 
+  ggplot(aes(reorder(country, estimate),estimate, color = p.value < 0.05)) + 
+  geom_hline(aes(yintercept = 0), linetype = 2) +
+  geom_point() + 
+  coord_flip() + 
+  facet_wrap(~continent, scales = "free_y") + 
+  scale_color_discrete(name = "Significant?") + 
+  scale_x_discrete(name = '') + 
+  theme_minimal() + 
+  theme(axis.text.y = element_text(size = 6))
+```
+
+---
+
+
+# Putting it all together
+
+
+```{r, echo = FALSE, fig.height=5}
+gapminder %>% 
+  group_by(country, continent) %>% 
+  nest() %>% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %>% 
+  mutate(foo_coefs = map(foo_model, broom::tidy)) %>% 
+  unnest(cols = foo_coefs) %>% 
+  filter(term == "gdpPercap") %>% 
+  ggplot(aes(reorder(country, estimate),estimate, color = p.value < 0.05)) + 
+  geom_hline(aes(yintercept = 0), linetype = 2) +
+  geom_point() + 
+  coord_flip() + 
+  facet_wrap(~continent, scales = "free_y") + 
+  scale_color_discrete(name = "Significant?") + 
+  scale_x_discrete(name = '') + 
+  theme_minimal() + 
+  theme(axis.text.y = element_text(size = 6))
+```
+
+---
+
+# Going deeper
+
+
+Suppose we wanted to compare the out-of-sample predictive power of 
+
+log(y) ~ x and y ~ x. 
+
+Can't use straight AIC... but what is AIC? A measure of predictive power!
+
+Let's put the out-of-sample predictive power of the two models to the test. 
+
+---
+
+
+# Creating out-of-sample data
+
+Let's create a bunch of dataframes, each of which is missing one country
+
+
+```{r}
+
+gapminder <- gapminder %>% 
+  modify_if(is.factor, as.character)
+
+oob_data <- tibble(omitted_country = unique(gapminder$country)) %>% 
+  mutate(training_data = map(omitted_country,~filter(gapminder, country != .x)),
+         testing_data = map(omitted_country,~filter(gapminder, country == .x)))
+
+```
+
+---
+
+
+# Creating candidate models
+
+let's compare three different models
+
+
+```{r}
+
+cand_models <-
+  c(
+    "log(lifeExp) ~ gdpPercap",
+    "lifeExp ~ gdpPercap",
+    "lifeExp ~ log(gdpPercap)",
+    "lifeExp ~ year + gdpPercap"
+  )
+```
+
+
+---
+
+# Creating Candidate Models
+
+And now we'll use tidyr::expand_grid to create factorial combinations of models and data
+
+```{r}
+
+
+model_sandbox <- tidyr::expand_grid(omitted_country = oob_data$omitted_country,
+                                    model = cand_models) %>% 
+  left_join(oob_data, by = "omitted_country")
+
+model_sandbox %>% 
+  head(5)
+
+
+```
+
+
+---
+
+# And now we're back in familiar territory!
+
+
+```{r}
+
+test <- model_sandbox %>%
+  mutate(fitted_model = map2(model, training_data, ~ lm(.x, data = .y))) %>%
+  mutate(predictions = map2(fitted_model, testing_data, ~ broom::augment(.x, newdata = .y))) %>%
+  select(omitted_country, model, predictions) %>%
+  unnest(cols = predictions) %>%
+  mutate(log_reg = str_detect(model,	"log\\(lifeExp\\)"),
+         .fitted = ifelse(log_reg, exp(.fitted), .fitted)) %>%
+  select(omitted_country, model, lifeExp, .fitted, log_reg, everything())
+
+
+head(test,2) 
+
+```
+
+
+---
+
+
+# Comparing Model Results
+
+.pull-left[
+```{r, eval = FALSE}
+test %>%
+  ggplot(aes(lifeExp, pmin(100,.fitted), fill = model)) +
+  geom_abline(aes(slope = 1, intercept = 0)) +
+  geom_point(size = 4, shape = 21, alpha = 0.5)
+
+```
+] .pull-right[
+
+```{r, echo = FALSE}
+test %>%
+  ggplot(aes(lifeExp, pmin(100,.fitted), fill = model)) +
+  geom_abline(aes(slope = 1, intercept = 0)) +
+  geom_point(size = 4, shape = 21, alpha = 0.5)
+
+```
+
+]
+---
+
+# Comparing Model Results
+
+
+```{r}
+test %>% 
+  filter((.fitted - lifeExp) > 25) %>% 
+  select(omitted_country) %>% 
+  unique()
+```
+
+
+---
+
+# Comparing Model Results
+
+Let's use out-of-sample root-mean-squared-error to select our model
+.pull-left[
+```{r, eval = FALSE}
+test %>% 
+  group_by(model) %>% 
+  summarise(rmse = sqrt(mean((lifeExp - .fitted)^2))) %>% 
+  ggplot(aes(reorder(model, rmse), rmse)) + 
+  geom_col() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+```
+] .pull-right[
+
+```{r, echo = FALSE}
+test %>% 
+  group_by(model) %>% 
+  summarise(rmse = sqrt(mean((lifeExp - .fitted)^2))) %>% 
+  ggplot(aes(reorder(model, rmse), rmse)) + 
+  geom_col() +   
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+
+```
+
+]
+
+
+---
+
+# purrr has lots of functions
+
+It's not just map...
+
+  - modify_
+    - change en element of a list in place
+  
+  - walk
+    - when all you want are the side effects
+  
+  - safely
+     - deals with failed elements
+
+---
+
+# modify
+
+```{r}
+gapminder
+```
+
+---
+
+# modify
+
+```{r}
+gapminder %>% 
+  modify_if(is.factor, as.character)
+```
+
+
+---
+
+# walk
+
+```{r}
+file.create(here::here("functions","foo.R"))
+file.create(here::here("functions","foo2.R"))
+
+foos <- list.files(here::here('functions'))
+
+foos <- foos[str_detect(foos,"\\.R")]
+
+walk(foos, ~source(here::here("functions",.x)))
+
+```
+
+
+---
+
+# safely
+
+Safely is one of my most used functions. We all have those cases where our function works 99% of the time, but that 1% of the time breaks everything. Sometimes it's unavoidable (hi TMB)
+
+```{r, error = TRUE}
+
+foo <- function(x){
+  
+  if (x > 0){
+    log(x)
+  } else
+  {
+    stop("Logging a negative!")
+  }
+  
+}
+
+test <- tibble(things = rnorm(10)) %>% 
+  mutate(food_thing = map(things,foo))
+
+
+```
+
+
+---
+
+# safely
+
+Wrap your function in `purrr::safely`
+
+```{r}
+test <- tibble(things = rnorm(10)) %>% 
+  mutate(food_thing = map(things,purrr::safely(foo)))
+
+test %>% 
+  head(1)
+```
+
+---
+
+# safely
+
+safely returns a list with two objects: the result of the function, and any error messages, one of which is always NULL (also, say hello to list columns!)
+
+```{r}
+test$food_thing[[1]]
+```
+
+---
+
+# safely
+
+We can keep using purrr to get only the entries that ran
+
+
+```{r}
+test %>% 
+  mutate(errors = map(food_thing,"error")) %>% 
+  mutate(worked = map_lgl(errors, is.null)) %>% 
+  filter(worked) %>% 
+  mutate(food_thing = map_dbl(food_thing,"result"))
+```
+
+
+---
+
+# Exercise - Use Catch to Predict Status
+
+Costello et al. 2012 used a regression of catch + life history to predict B/Bmsy
+
+Let's give it a try ourselves (in way fewer lines of code than the original)
+
+1. Load in data and tidy it up
+
+2. Test out some candidate regressions, select best
+
+3. Test regressions on actual out-of-sample prediction
+  - is "best" still best?
+
+---
+
+# Exercise - Use Catch to Predict Status
+
+
+Data are in `here::here("data","ram_timeseries.csv")`
+
+- Some variables from Costello et al. 2012
+
+  - catch/max(catch)
+  
+  - running catch / mean(catch)
+  
+  - lag1, lag2, lag3 catch
+  
+  - catch
+  
+  - age of fishery
+  
+  - isscaap species group
+  
+  - etc. 
+
+Hint: data are not tidy to start! check out [`rsample`](https://github.com/tidymodels/rsample) package
+
+---
+
+
