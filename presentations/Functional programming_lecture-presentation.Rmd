@@ -76,6 +76,75 @@ foo()
 ```
 
 
+
+# Getting things out of functions
+
+By default, functions return the last thing inside them. 
+
+What will `result` contain?
+
+
+```{r, echo=TRUE}
+foo <- function(x){
+  
+  y = x^2
+  
+  print("hello")
+}
+
+result <- foo(2)
+result
+```
+
+
+# Getting things out of functions
+
+You can overwrite this behavior by calling `return` explicitly
+
+```{r, echo = TRUE}
+foo <- function(x){
+  
+  y = x^2
+  
+  print("hello")
+  
+  return(y)
+
+}
+
+result <- foo(2)
+result
+```
+
+# Getting things out of functions
+
+
+Want multiple outputs? Make it a list
+
+
+```{r, echo = TRUE}
+
+foo <- function(x){
+  
+  
+  y = x^2
+  
+  z <- rep(x,2)
+  
+  w <- data.frame(x = z, y = y)
+  
+  return(list(y = y,
+              z = z,
+              w = w))
+
+}
+
+result <- foo(2)
+result
+```
+
+
+
 # First-class functions {#first-class-functions}
 \index{functions!anonymous} 
 \index{anonymous functions}
