@@ -381,48 +381,55 @@ Common functionals: `lapply()`, `apply()`, `tapply()`; purrr's `map()`;  `integr
 
 
 
+# Non-standard evaluation
+
+Suppose you wanted to write a function like this: why won't this work?
+
+
+```{r, echo = TRUE}
+foo <- function(data,colorvar){
+  
+  data %>% 
+    ggplot(aes(x,y, color = colorvar)) + 
+    geom_point()
+  
+}
+
+
+```
+
+# Tidy Evaluation
+
+We don't have time to explain this, but the solution is [tidy evaluation](https://tidyeval.tidyverse.org/index.html)
+
+Also see [here](https://dplyr.tidyverse.org/articles/programming.html) and
+
+[here](https://www.tidyverse.org/articles/2018/07/ggplot2-tidy-evaluation/)
+
+```{r, echo = TRUE}
+
+foo <- function(data, histvar, fillvar) {
+  
+  histvar <- enquo(histvar) # captures what the user typed
+  
+  fillvar <- enquo(fillvar)
+
+  # !! (bang-bang) evaluates the contents of the enquoted variable 
+    data %>%
+    ggplot(aes(!!histvar, fill = !!fillvar)) +
+    geom_histogram()
+  
+}
+
+
+foo(iris, Sepal.Length, Species)
+
+```
 
 
 
 
 
-
-
-# Suggested Topics
-
-Feel free to adapt anything you'd like from my `purrr` tutorial 
-
-https://www.weirdfishes.blog/blog/practical-purrr/
-
-I've included the code for that in the presentations folder
-
-Given short amount of time, I don't recommend trying to teach both the apply suite (apply, lapply, sapply) and purrr in depth. I've found people have an easier time learning map over apply, mostly because the syntax is the same across all map_ functions, as oppoesd to apply (e.g. first argument to `apply` are the data, first to `mapply` is a function); `map` seems to make it easier to focus on whats happening an not the function structure. purrr is also much more consistent about the type of object produced by the function. So I might recommend focusing on purrr and showing an example or two using base apply so that thaty have that to compare to. 
-
-## Suggested Topics
-
-- Writing functions
-  - pure functions
-  - http://adv-r.had.co.nz/Functions.html
-  - setting default values
-  - documenting functions with `roxygen`
-  - environments
-    - DON'T USE GLOBAL VARIABLE INSIDE FUNCTIONS
-    - what happens inside functions stays inside functions
-      - except the results of the function
-      - or for special things like `rm`
-  - Getting things out of functions
-    - returning list objects
-
-- Debugging functions
-  - browser, breakpoints, etc. 
-
-- Applying functions
-  - basic use of function in map/apply
-  - annonymous functions (in map at least)
-  - map, map2, pmap
-    - with different kinds of outputs, e.g. map_chr vs map_dbl
-    
-## Suggested Topics
 
 - Non-standard evaluation
   - e.g. passing grouping variables as a variable to a function
@@ -430,23 +437,8 @@ Given short amount of time, I don't recommend trying to teach both the apply sui
   - https://github.com/rstudio/cheatsheets/raw/master/tidyeval.pdf
 
 
-## Suggested Topics
 
-- Manipulating lists
-  - Using purrr to access/modify parts of deeply nested lists (https://github.com/jennybc/repurrrsive)
-
-- Organizing list objects in tibbles
-  - creating and accessing elements of list-columns
-  
-- Putting it all together
-  - e.g. the regression example in my tutorial
-  - use a tibble to organize candidate models
-  - create list column of fitted models
-  - use `map` to extract things RMSE for each model, adding results as a double column
-
-## Suggested Topics
-
-A few other resources
+# A few other resources
 
 * https://speakerdeck.com/jennybc/purrr-workshop?slide=6
 
