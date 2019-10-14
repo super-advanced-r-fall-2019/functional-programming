@@ -235,8 +235,14 @@ map2_chr(c('one','two','red','blue'), c('fish'), paste)
 
 ---
 
-# Multiple lists using `pmap`
+# Exercise: using `pmap`
 
+ Use `pmap` to produce a string of the format
+
+"Diamond <diamond number> sold for <price> and was <carats> carats"
+
+Most of these examples can be vectorized, but point is to start easy. 
+--
 ```{r}
 
 dmonds <- diamonds %>% 
@@ -258,25 +264,6 @@ pmap_chr(list(list1 = 1:nrow(dmonds),
 
 ---
 
-
-# Exercise: Finding NAs
-
-Use `purrr` to find rows that have entries for both x and y (no using na.omit!)
-
-
-```{r, echo=FALSE}
-
-x <- c(1,5,NA,NA,2,3)
-
-y <-  c(NA, 1, 6.3, NA,NA, 3)
-
-z <-  data_frame(x = x, y = y)
-
-knitr::kable(z, format = "html")
-```
-
-
----
 
 # Wrangling Lists
 
@@ -455,6 +442,18 @@ got_chars[1:5] %>%
 
 ---
 
+
+# Wrangling Lists - Lists to DF
+
+```{r}
+map_dfr(got_chars,
+        `[`,
+        c("name", "culture", "gender", "id", "born", "alive"))
+```
+
+
+---
+
 # Wrangling Lists
 
 Putting things together, now suppose that we want to find all the Lanisters in the GoT list
@@ -538,6 +537,32 @@ gapminder %>%
 
 ---
 
+# Exercise:
+
+How could we add the fitted $R^2$ to the dataframe?
+
+--
+
+
+```{r}
+
+r2foo <- function(x){
+  modsum <- summary(x)
+  out <- modsum$r.squared
+}
+
+gapminder %>% 
+  group_by(country) %>% 
+  nest() %>% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %>% 
+  mutate(r2 = map_dbl(foo_model, r2foo)) %>% 
+  head(2)
+```
+
+
+
+---
+
 # unnest
 
 So in a few lines of code we've neatly fit and stored regressions by continent! Now suppose we want to examine the distribution of per capita GDP coefficients. We can use `broom::tidy` to make a tidy dataframe of the regression outputs. 
@@ -558,7 +583,7 @@ gapminder %>%
 
 # unnest
 
-And then use unnest to get things back in a handy format for plotting!
+And then we can use unnest to get things back in a handy format for plotting
 
 ```{r}
 gapminder %>% 
@@ -912,6 +937,34 @@ test %>%
   mutate(food_thing = map_dbl(food_thing,"result"))
 ```
 
+
+---
+
+# parallel purrr
+
+There are lots of ways to run things in parallel once they're in a tidy format. [`furrr`](https://davisvaughan.github.io/furrr/) is the easist. 
+
+setup cores using `plan`, then just add `future_` before map!
+
+
+
+```{r, eval = FALSE}
+library(furrr)
+
+plan(multiprocess, cores = 2)
+
+test <- model_sandbox %>%
+  mutate(fitted_model = future_map2(model, training_data, ~ lm(.x, data = .y))) %>% #<<
+  mutate(predictions = future_map2(fitted_model, testing_data, ~ broom::augment(.x, newdata = .y))) %>% #<<
+  select(omitted_country, model, predictions) %>%
+  unnest(cols = predictions) %>%
+  mutate(log_reg = str_detect(model,	"log\\(lifeExp\\)"),
+         .fitted = ifelse(log_reg, exp(.fitted), .fitted)) %>%
+  select(omitted_country, model, lifeExp, .fitted, log_reg, everything())
+
+
+
+```
 
 ---
 

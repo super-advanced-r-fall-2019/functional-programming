@@ -4,7 +4,7 @@
     <title>Data Wrangling and Model Fitting using purrr</title>
     <meta charset="utf-8" />
     <meta name="author" content="Dan Ovando" />
-    <meta name="date" content="2019-10-13" />
+    <meta name="date" content="2019-10-14" />
     <link href="libs/remark-css/default.css" rel="stylesheet" />
     <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
     <script src="libs/htmlwidgets/htmlwidgets.js"></script>
@@ -21,7 +21,7 @@ class: center, middle, inverse, title-slide
 ## FSH 507
 ### Dan Ovando
 ### University of Washington
-### 2019-10-13
+### 2019-10-14
 
 ---
 
@@ -303,8 +303,14 @@ map2_chr(c('one','two','red','blue'), c('fish'), paste)
 
 ---
 
-# Multiple lists using `pmap`
+# Exercise: using `pmap`
 
+ Use `pmap` to produce a string of the format
+
+"Diamond &lt;diamond number&gt; sold for &lt;price&gt; and was &lt;carats&gt; carats"
+
+Most of these examples can be vectorized, but point is to start easy. 
+--
 
 ```r
 dmonds &lt;- diamonds %&gt;% 
@@ -332,49 +338,6 @@ pmap_chr(list(list1 = 1:nrow(dmonds),
 
 ---
 
-
-# Exercise: Finding NAs
-
-Use `purrr` to find rows that have entries for both x and y (no using na.omit!)
-
-
-&lt;table&gt;
- &lt;thead&gt;
-  &lt;tr&gt;
-   &lt;th style="text-align:right;"&gt; x &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; y &lt;/th&gt;
-  &lt;/tr&gt;
- &lt;/thead&gt;
-&lt;tbody&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:right;"&gt; 5 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 1.0 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 6.3 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:right;"&gt; 2 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; NA &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:right;"&gt; 3 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 3.0 &lt;/td&gt;
-  &lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-
-
----
 
 # Wrangling Lists
 
@@ -651,6 +614,36 @@ got_chars[1:5] %&gt;%
 
 ---
 
+
+# Wrangling Lists - Lists to DF
+
+
+```r
+map_dfr(got_chars,
+        `[`,
+        c("name", "culture", "gender", "id", "born", "alive"))
+```
+
+```
+## # A tibble: 30 x 6
+##    name            culture  gender    id born                         alive
+##    &lt;chr&gt;           &lt;chr&gt;    &lt;chr&gt;  &lt;int&gt; &lt;chr&gt;                        &lt;lgl&gt;
+##  1 Theon Greyjoy   Ironborn Male    1022 In 278 AC or 279 AC, at Pyke TRUE 
+##  2 Tyrion Lannist… ""       Male    1052 In 273 AC, at Casterly Rock  TRUE 
+##  3 Victarion Grey… Ironborn Male    1074 In 268 AC or before, at Pyke TRUE 
+##  4 Will            ""       Male    1109 ""                           FALSE
+##  5 Areo Hotah      Norvoshi Male    1166 In 257 AC or before, at Nor… TRUE 
+##  6 Chett           ""       Male    1267 At Hag's Mire                FALSE
+##  7 Cressen         ""       Male    1295 In 219 AC or 220 AC          FALSE
+##  8 Arianne Martell Dornish  Female   130 In 276 AC, at Sunspear       TRUE 
+##  9 Daenerys Targa… Valyrian Female  1303 In 284 AC, at Dragonstone    TRUE 
+## 10 Davos Seaworth  Westeros Male    1319 In 260 AC or before, at Kin… TRUE 
+## # … with 20 more rows
+```
+
+
+---
+
 # Wrangling Lists
 
 Putting things together, now suppose that we want to find all the Lanisters in the GoT list
@@ -762,6 +755,41 @@ gapminder %&gt;%
 
 ---
 
+# Exercise:
+
+How could we add the fitted `\(R^2\)` to the dataframe?
+
+--
+
+
+
+```r
+r2foo &lt;- function(x){
+  modsum &lt;- summary(x)
+  out &lt;- modsum$r.squared
+}
+
+gapminder %&gt;% 
+  group_by(country) %&gt;% 
+  nest() %&gt;% 
+  mutate(foo_model = map(data, ~lm(lifeExp ~ gdpPercap, data = .x))) %&gt;% 
+  mutate(r2 = map_dbl(foo_model, r2foo)) %&gt;% 
+  head(2)
+```
+
+```
+## # A tibble: 2 x 4
+## # Groups:   country [142]
+##   country               data foo_model      r2
+##   &lt;fct&gt;       &lt;list&lt;df[,5]&gt;&gt; &lt;list&gt;      &lt;dbl&gt;
+## 1 Afghanistan       [12 × 5] &lt;lm&gt;      0.00226
+## 2 Albania           [12 × 5] &lt;lm&gt;      0.701
+```
+
+
+
+---
+
 # unnest
 
 So in a few lines of code we've neatly fit and stored regressions by continent! Now suppose we want to examine the distribution of per capita GDP coefficients. We can use `broom::tidy` to make a tidy dataframe of the regression outputs. 
@@ -791,7 +819,7 @@ gapminder %&gt;%
 
 # unnest
 
-And then use unnest to get things back in a handy format for plotting!
+And then we can use unnest to get things back in a handy format for plotting
 
 
 ```r
@@ -833,7 +861,7 @@ gapminder %&gt;%
   geom_histogram()
 ```
 
-&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-28-1.svg" style="display: block; margin: auto;" /&gt;
+&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-29-1.svg" style="display: block; margin: auto;" /&gt;
 
 
 ---
@@ -867,7 +895,7 @@ gapminder %&gt;%
 # Putting it all together
 
 
-&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-30-1.svg" style="display: block; margin: auto;" /&gt;
+&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-31-1.svg" style="display: block; margin: auto;" /&gt;
 
 ---
 
@@ -993,7 +1021,7 @@ test %&gt;%
 ```
 ] .pull-right[
 
-&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-36-1.svg" style="display: block; margin: auto;" /&gt;
+&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-37-1.svg" style="display: block; margin: auto;" /&gt;
 
 ]
 ---
@@ -1037,7 +1065,7 @@ test %&gt;%
 ```
 ] .pull-right[
 
-&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-39-1.svg" style="display: block; margin: auto;" /&gt;
+&lt;img src="functional-programming-with-purrr_files/figure-html/unnamed-chunk-40-1.svg" style="display: block; margin: auto;" /&gt;
 
 ]
 
@@ -1235,6 +1263,32 @@ test %&gt;%
 ## 3  1.32       0.278 &lt;NULL&gt; TRUE
 ```
 
+
+---
+
+# parallel purrr
+
+There are lots of ways to run things in parallel once they're in a tidy format. [`furrr`](https://davisvaughan.github.io/furrr/) is the easist. 
+
+setup cores using `plan`, then just add `future_` before map!
+
+
+
+
+```r
+library(furrr)
+
+plan(multiprocess, cores = 2)
+
+test &lt;- model_sandbox %&gt;%
+* mutate(fitted_model = future_map2(model, training_data, ~ lm(.x, data = .y))) %&gt;%
+* mutate(predictions = future_map2(fitted_model, testing_data, ~ broom::augment(.x, newdata = .y))) %&gt;%
+  select(omitted_country, model, predictions) %&gt;%
+  unnest(cols = predictions) %&gt;%
+  mutate(log_reg = str_detect(model,	"log\\(lifeExp\\)"),
+         .fitted = ifelse(log_reg, exp(.fitted), .fitted)) %&gt;%
+  select(omitted_country, model, lifeExp, .fitted, log_reg, everything())
+```
 
 ---
 
